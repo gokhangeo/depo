@@ -136,7 +136,7 @@
             projectId: "depolama-1270b",
             storageBucket: "depolama-1270b.firebasestorage.app",
             messagingSenderId: "653327617266",
-            appId: "1:653327617266:web:353b1fa71e45eaa189546b"
+            appId: "1:653327617266:web:4e080f3d75b87dff89546b"
         };
 
         if (typeof __firebase_config !== 'undefined' && __firebase_config) {
@@ -256,7 +256,12 @@
                 }
             } catch (error) {
                 console.error(error);
-                showToast("Giriş yapılamadı", "error");
+                showToast("Firebase Anonim Giriş kapalı!", "error");
+                els.docList.innerHTML = `
+                    <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
+                        <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
+                        <p class="text-sm text-red-400">Bağlantı reddedildi.<br>Firebase'den 'Anonymous' girişi açın.</p>
+                    </div>`;
             }
         }
 
