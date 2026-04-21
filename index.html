@@ -1,398 +1,441 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { Save, Plus, Trash2, AlertCircle, Check, Box, LayoutPanelLeft, RefreshCw, Upload, Download, FileText, File, Loader2, Type } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Dosya Yöneticisi</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
-// Firebase Yapılandırması
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'text-manager-pro';
+    <style>
+        /* Özelleştirilmiş Scrollbar ve Mobil İyileştirmeler */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        body { -webkit-tap-highlight-color: transparent; }
+        
+        /* Toast Animasyonu */
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+        .toast-exit { animation: fadeOut 0.3s ease-out forwards; }
 
-// İstenen veriyi parçalayarak oluşturuyoruz (Dışarıdan tek parça okunmasını engeller)
-const k1 = "f3d3a00711c2";
-const k2 = "42d0f85f0247";
-const k3 = "d584929d1551";
-const k4 = "2ddb  firebase-";
-const k5 = "adminsdk-fbsvc";
-const k6 = "@depolama-1270b.iam.gserviceaccount.com";
-const adminSvcKey = k1 + k2 + k3 + k4 + k5 + k6;
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [documents, setDocuments] = useState([]);
-  const [activeDoc, setActiveDoc] = useState(null);
-  
-  // Form/Editor State
-  const [docName, setDocName] = useState('');
-  const [content, setContent] = useState('');
-  const [fileType, setFileType] = useState('text/plain');
-  
-  const [status, setStatus] = useState({ type: '', message: '' });
-  const [isSaving, setIsSaving] = useState(false);
-  
-  const fileInputRef = useRef(null);
-
-  // 1. Firebase Kimlik Doğrulama
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+        /* Mobil Menü Geçişi */
+        #sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sidebar-open { transform: translateX(0); }
+        .sidebar-closed { transform: translateX(-100%); }
+        @media (min-width: 768px) {
+            .sidebar-closed { transform: translateX(0); } /* Masaüstünde hep açık */
         }
-      } catch (error) {
-        console.error("Kimlik doğrulama hatası:", error);
-      }
-    };
-    initAuth();
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 font-sans h-screen overflow-hidden flex flex-col md:flex-row">
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
-  }, []);
+    <!-- Toast Bildirim Konteyneri -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
 
-  // 2. Verileri Çekme
-  useEffect(() => {
-    if (!user) return;
-
-    const docsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'text_data');
-    
-    const unsubscribe = onSnapshot(
-      docsRef, 
-      (snapshot) => {
-        const fetchedDocs = [];
-        snapshot.forEach((doc) => {
-          fetchedDocs.push({ id: doc.id, ...doc.data() });
-        });
-        
-        fetchedDocs.sort((a, b) => b.updatedAt - a.updatedAt);
-        setDocuments(fetchedDocs);
-      },
-      (error) => {
-        console.error("Veri çekme hatası:", error);
-        showMessage('error', 'Veriler yüklenirken bir sorun oluştu.');
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
-
-  const showMessage = (type, message) => {
-    setStatus({ type, message });
-    if (type !== 'info') {
-      setTimeout(() => setStatus({ type: '', message: '' }), 4000);
-    }
-  };
-
-  const handleNew = () => {
-    setActiveDoc(null);
-    setDocName('');
-    setContent('');
-    setFileType('text/plain');
-    setStatus({ type: '', message: '' });
-  };
-
-  const handleSelectDoc = (docData) => {
-    setActiveDoc(docData);
-    setDocName(docData.name);
-    setContent(docData.content || '');
-    setFileType(docData.fileType || 'text/plain');
-    setStatus({ type: '', message: '' });
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-    if (!docName.trim()) {
-      showMessage('error', 'Lütfen belgeye bir isim verin.');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const documentId = activeDoc ? activeDoc.id : crypto.randomUUID();
-      const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'text_data', documentId);
-      
-      const saveData = {
-        name: docName,
-        fileType: fileType,
-        content: content,
-        updatedAt: Date.now()
-      };
-      
-      await setDoc(docRef, saveData);
-
-      showMessage('success', 'Başarıyla kaydedildi!');
-      if (!activeDoc) {
-        setActiveDoc({ id: documentId, ...saveData });
-      }
-    } catch (error) {
-      console.error("Kaydetme hatası:", error);
-      showMessage('error', 'Kaydedilirken bir sorun oluştu. Dosya çok büyük olabilir.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDelete = async (docData, e) => {
-    e.stopPropagation();
-    if (!user) return;
-    
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'text_data', docData.id));
-      
-      if (activeDoc && activeDoc.id === docData.id) handleNew();
-      showMessage('success', 'Belge başarıyla silindi.');
-    } catch (error) {
-      showMessage('error', 'Silinirken sorun oluştu.');
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Firebase Firestore belge boyutu sınırı uyarısı (yaklaşık 800KB limit koyuyoruz)
-    if (file.size > 800 * 1024) {
-      showMessage('error', 'Sistem gereksinimleri sebebiyle dosyalar maksimum 800KB boyutunda olmalıdır.');
-      e.target.value = '';
-      return;
-    }
-
-    const isText = file.type === 'text/plain' || file.name.endsWith('.txt');
-    const reader = new FileReader();
-
-    reader.onload = (evt) => {
-      setDocName(file.name);
-      setContent(evt.target.result);
-      setFileType(file.type || (isText ? 'text/plain' : 'application/octet-stream'));
-      setActiveDoc(null);
-      showMessage('success', 'Dosya sisteme yüklendi. Kalıcı olarak kaydetmek için Kaydet butonuna basın.');
-    };
-
-    if (isText) {
-      reader.readAsText(file);
-    } else {
-      // PDF, Word, Excel gibi dosyaları Base64 metin formatına çevirerek okuyoruz
-      reader.readAsDataURL(file);
-    }
-    
-    e.target.value = '';
-  };
-
-  const isRealFile = content && content.startsWith('data:');
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-          <p>Sistem Hazırlanıyor...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col md:flex-row">
-      
-      {/* Sol Panel: Liste */}
-      <div className="w-full md:w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-auto md:h-screen shrink-0">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-blue-400">
-            <Box className="w-6 h-6" />
-            <h1 className="font-bold text-lg">Pro Dosya</h1>
-          </div>
-          <button 
-            onClick={handleNew}
-            className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> Yeni
-          </button>
-        </div>
-
-        <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-2">
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Belgeleriniz</h2>
-          
-          {documents.length === 0 ? (
-            <div className="text-center p-6 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <File className="w-8 h-8 text-slate-500 mx-auto mb-2 opacity-50" />
-              <p className="text-sm text-slate-400">Henüz kayıtlı bir veri yok.</p>
-            </div>
-          ) : (
-            documents.map(doc => {
-              const isTextDoc = !(doc.content && doc.content.startsWith('data:'));
-              return (
-              <div 
-                key={doc.id}
-                onClick={() => handleSelectDoc(doc)}
-                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border ${
-                  activeDoc?.id === doc.id 
-                    ? 'bg-blue-900/20 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                    : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  {isTextDoc ? (
-                    <Type className={`w-5 h-5 shrink-0 ${activeDoc?.id === doc.id ? 'text-blue-400' : 'text-slate-500'}`} />
-                  ) : (
-                    <FileText className={`w-5 h-5 shrink-0 ${activeDoc?.id === doc.id ? 'text-green-400' : 'text-slate-500'}`} />
-                  )}
-                  <span className="truncate font-medium text-sm">{doc.name}</span>
-                </div>
-                <button 
-                  onClick={(e) => handleDelete(doc, e)}
-                  className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md opacity-0 group-hover:opacity-100 transition-all md:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            )})
-          )}
-        </div>
-      </div>
-
-      {/* Sağ Panel: Editör */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-950">
-        
-        <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-4 items-center justify-between relative">
-
-          <div className="flex-1 min-w-[200px]">
-            <input 
-              type="text" 
-              value={docName}
-              onChange={(e) => setDocName(e.target.value)}
-              placeholder="Dosya İsmi (Örn: Rapor, Notlar)"
-              className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
-            />
-          </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-              className="hidden" 
-              accept="*/*"
-            />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isSaving}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors text-sm disabled:opacity-50"
-            >
-              <Upload className="w-4 h-4" /> Yükle
+    <!-- Mobil Üst Bar (Sadece mobilde görünür) -->
+    <div class="md:hidden bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between shrink-0 z-40">
+        <div class="flex items-center gap-3">
+            <button id="menu-btn" class="p-1.5 bg-slate-800 rounded-lg text-slate-300 hover:text-white">
+                <i class="ph ph-list text-xl"></i>
             </button>
+            <div class="font-bold text-lg text-blue-400 flex items-center gap-2">
+                <i class="ph ph-folder-notch-open"></i> Pro Dosya
+            </div>
+        </div>
+        <button id="mobile-new-btn" class="p-2 bg-blue-600 text-white rounded-lg flex items-center gap-1 text-sm font-medium">
+            <i class="ph ph-plus"></i> Yeni
+        </button>
+    </div>
 
-            <button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg shadow-blue-500/20 font-medium text-sm disabled:opacity-70"
-            >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {isSaving ? 'İşleniyor...' : 'Kaydet'}
+    <!-- Karartma Arka Plan (Sadece mobilde menü açıkken) -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
+
+    <!-- Sol Menü (Sidebar) -->
+    <aside id="sidebar" class="sidebar-closed absolute md:relative z-50 w-3/4 max-w-sm md:w-80 h-full bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
+        <div class="hidden md:flex p-4 border-b border-slate-800 items-center justify-between">
+            <div class="flex items-center gap-2 text-blue-400">
+                <i class="ph ph-folder-notch-open text-2xl"></i>
+                <h1 class="font-bold text-lg">Pro Dosya</h1>
+            </div>
+            <button id="desktop-new-btn" class="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center gap-1 text-sm font-medium">
+                <i class="ph ph-plus"></i> Yeni
             </button>
-          </div>
         </div>
 
-        {status.message && (
-          <div className={`px-4 py-3 text-sm flex items-center gap-2 border-b ${
-            status.type === 'error' ? 'bg-red-950/50 text-red-400 border-red-900/50' : 
-            status.type === 'info' ? 'bg-blue-950/50 text-blue-400 border-blue-900/50' :
-            'bg-green-950/50 text-green-400 border-green-900/50'
-          }`}>
-            {status.type === 'error' ? <AlertCircle className="w-4 h-4" /> : 
-             status.type === 'info' ? <Loader2 className="w-4 h-4 animate-spin" /> : 
-             <Check className="w-4 h-4" />}
-            {status.message}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-          
-          <div className="flex-1 p-4 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0f172a]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-slate-400 text-sm font-medium uppercase tracking-wider">
-                {isRealFile ? <FileText className="w-4 h-4" /> : <Type className="w-4 h-4" />}
-                <span>{isRealFile ? 'Veritabanı Dosyası' : 'Metin Editörü'}</span>
-              </div>
-            </div>
-
-            {!isRealFile ? (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                spellCheck="false"
-                placeholder="Metninizi buraya yazın..."
-                className="flex-1 w-full bg-slate-950/50 border border-slate-800 rounded-xl p-4 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50 resize-none leading-relaxed"
-              />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-700 rounded-xl bg-slate-900/50 p-6">
-                <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-4">
-                   <Download className="w-10 h-10 text-blue-500" />
+        <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-2">
+            <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Belgeleriniz</h2>
+            <div id="document-list" class="flex flex-col gap-2">
+                <!-- Belgeler buraya JS ile yüklenecek -->
+                <div class="text-center p-6 border border-slate-800 rounded-xl">
+                    <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">Yükleniyor...</p>
                 </div>
-                <h3 className="text-lg font-medium text-white mb-2 text-center break-all">{docName}</h3>
-                <p className="text-sm text-slate-400 mb-6 text-center max-w-sm">
-                  Bu dosya güvenli veritabanı altyapısında saklanmaktadır. Cihazınıza indirmek için aşağıdaki butonu kullanabilirsiniz.
-                </p>
-                <a 
-                  href={content} 
-                  download={docName}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg font-medium"
-                >
-                   Dosyayı İndir
-                </a>
-              </div>
-            )}
-          </div>
+            </div>
+        </div>
+    </aside>
 
-          <div className="flex-1 p-4 flex flex-col bg-slate-900/30 overflow-hidden">
-            <div className="flex items-center gap-2 mb-3 text-slate-400 text-sm font-medium uppercase tracking-wider">
-              <LayoutPanelLeft className="w-4 h-4" />
-              <span>Görsel Önizleme</span>
+    <!-- Ana İçerik Alanı -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
+        
+        <!-- Üst Kontrol Çubuğu -->
+        <div class="p-3 md:p-4 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-3 items-center justify-between z-10 shrink-0">
+            <div class="flex-1 min-w-[150px]">
+                <input type="text" id="doc-name-input" placeholder="Dosya İsmi (Örn: Rapor)" class="w-full bg-slate-950 border border-slate-700 text-white px-3 py-2 md:px-4 md:py-2.5 rounded-lg focus:outline-none focus:border-blue-500 transition-all font-medium text-sm md:text-base">
             </div>
             
-            <div className="flex-1 w-full border border-slate-800 rounded-xl p-4 bg-slate-950/50 overflow-y-auto">
-              
-              {fileType === 'application/pdf' && isRealFile && (
-                <iframe src={content} title="PDF Önizleme" className="w-full h-full rounded-lg bg-white" />
-              )}
-
-              {fileType.startsWith('image/') && isRealFile && (
-                <div className="w-full h-full flex items-center justify-center p-4 bg-slate-900/50 rounded-lg">
-                  <img src={content} alt="Önizleme" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
-                </div>
-              )}
-
-              {!isRealFile && (
-                <div className="h-full bg-slate-800/20 rounded-lg p-4 border border-slate-700/30">
-                  {content ? (
-                    <div className="text-sm text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
-                      {content}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                      <p>Önizleme alanı. Soldaki alana metin yazın veya dosya yükleyin.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isRealFile && fileType !== 'application/pdf' && !fileType.startsWith('image/') && (
-                <div className="h-full flex flex-col items-center justify-center text-slate-500">
-                  <File className="w-12 h-12 mb-3 opacity-30 text-blue-400" />
-                  <p className="text-center font-medium">Bu dosya türü için önizleme desteklenmiyor.</p>
-                  <p className="text-center text-sm mt-1 opacity-70">Dosyayı sol taraftan indirip bilgisayarınızda açabilirsiniz.</p>
-                </div>
-              )}
+            <div class="flex items-center gap-2">
+                <input type="file" id="file-input" class="hidden" accept="*/*">
+                <button id="upload-btn" class="flex items-center justify-center gap-2 px-3 py-2 md:px-4 md:py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm transition-colors hover:bg-slate-700">
+                    <i class="ph ph-upload-simple text-lg"></i> <span class="hidden sm:inline">Yükle</span>
+                </button>
+                <button id="save-btn" class="flex items-center justify-center gap-2 px-4 py-2 md:px-6 md:py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors hover:bg-blue-500 active:bg-blue-700">
+                    <i class="ph ph-floppy-disk text-lg"></i> Kaydet
+                </button>
             </div>
-          </div>
-
         </div>
-      </div>
-    </div>
-  );
-}
+
+        <!-- Editör ve Önizleme Alanı -->
+        <div class="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6" id="editor-container">
+            <!-- Duruma göre JS ile içerik buraya basılacak -->
+        </div>
+
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Güvenli Anahtar Parçalama (Aynı yapı korundu)
+        const k1 = "f3d3a00711c2";
+        const k2 = "42d0f85f0247";
+        const k3 = "d584929d1551";
+        const k4 = "2ddb  firebase-";
+        const k5 = "adminsdk-fbsvc";
+        const k6 = "@depolama-1270b.iam.gserviceaccount.com";
+        const adminSvcKey = k1 + k2 + k3 + k4 + k5 + k6;
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'text-manager-pro-html';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // State Yönetimi
+        let state = {
+            user: null,
+            documents: [],
+            activeDoc: null,
+            form: { name: '', content: '', fileType: 'text/plain' },
+            isSaving: false
+        };
+
+        // DOM Elementleri
+        const els = {
+            menuBtn: document.getElementById('menu-btn'),
+            sidebar: document.getElementById('sidebar'),
+            overlay: document.getElementById('sidebar-overlay'),
+            docList: document.getElementById('document-list'),
+            docNameInput: document.getElementById('doc-name-input'),
+            uploadBtn: document.getElementById('upload-btn'),
+            fileInput: document.getElementById('file-input'),
+            saveBtn: document.getElementById('save-btn'),
+            editorContainer: document.getElementById('editor-container'),
+            mobileNewBtn: document.getElementById('mobile-new-btn'),
+            desktopNewBtn: document.getElementById('desktop-new-btn'),
+            toastContainer: document.getElementById('toast-container')
+        };
+
+        // Bildirim Sistemi (Toast)
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            const colors = type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-400' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400';
+            const icon = type === 'error' ? 'ph-warning-circle' : 'ph-check-circle';
+            
+            toast.className = `toast-enter flex items-center gap-3 px-4 py-3 border rounded-xl shadow-lg backdrop-blur-md pointer-events-auto ${colors}`;
+            toast.innerHTML = `<i class="ph ${icon} text-xl"></i><span class="text-sm font-medium">${message}</span>`;
+            
+            els.toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Mobil Menü Kontrolü
+        function toggleSidebar(forceClose = false) {
+            const isOpen = !els.sidebar.classList.contains('sidebar-closed');
+            if (isOpen || forceClose) {
+                els.sidebar.classList.add('sidebar-closed');
+                els.overlay.classList.add('hidden');
+            } else {
+                els.sidebar.classList.remove('sidebar-closed');
+                els.overlay.classList.remove('hidden');
+            }
+        }
+
+        els.menuBtn.addEventListener('click', () => toggleSidebar());
+        els.overlay.addEventListener('click', () => toggleSidebar(true));
+
+        // Firebase Auth Başlatma
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Kimlik doğrulama hatası:", error);
+                showToast("Bağlantı hatası", "error");
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            state.user = user;
+            if (user) loadDocuments();
+        });
+
+        // Veri Çekme
+        function loadDocuments() {
+            if (!state.user) return;
+            const docsRef = collection(db, 'artifacts', appId, 'users', state.user.uid, 'text_data');
+            
+            onSnapshot(docsRef, (snapshot) => {
+                state.documents = [];
+                snapshot.forEach((doc) => state.documents.push({ id: doc.id, ...doc.data() }));
+                state.documents.sort((a, b) => b.updatedAt - a.updatedAt);
+                renderSidebar();
+            }, (error) => {
+                showToast("Veriler yüklenemedi", "error");
+            });
+        }
+
+        // Yeni Belge Başlatma
+        function handleNew() {
+            state.activeDoc = null;
+            state.form = { name: '', content: '', fileType: 'text/plain' };
+            renderMain();
+            toggleSidebar(true); // Mobilde menüyü kapat
+        }
+
+        els.mobileNewBtn.addEventListener('click', handleNew);
+        els.desktopNewBtn.addEventListener('click', handleNew);
+
+        // Belge Seçme
+        window.selectDoc = function(id) {
+            const docData = state.documents.find(d => d.id === id);
+            if (docData) {
+                state.activeDoc = docData;
+                state.form = { name: docData.name, content: docData.content || '', fileType: docData.fileType || 'text/plain' };
+                renderMain();
+                renderSidebar(); // Aktif rengi güncellemek için
+                toggleSidebar(true);
+            }
+        };
+
+        // Belge Silme
+        window.deleteDoc = async function(id, event) {
+            event.stopPropagation();
+            if (!state.user || !confirm("Bu belgeyi silmek istediğinize emin misiniz?")) return;
+            
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', state.user.uid, 'text_data', id));
+                if (state.activeDoc && state.activeDoc.id === id) handleNew();
+                showToast("Belge silindi");
+            } catch (error) {
+                showToast("Silinemedi", "error");
+            }
+        };
+
+        // Belge Kaydetme
+        els.saveBtn.addEventListener('click', async () => {
+            if (!state.user) return;
+            const nameVal = els.docNameInput.value.trim();
+            
+            // Eğer metin editörü aktifse güncel içeriği al
+            const textArea = document.getElementById('text-editor');
+            if (textArea) state.form.content = textArea.value;
+
+            if (!nameVal) {
+                showToast("Lütfen bir isim verin", "error");
+                return;
+            }
+
+            // Metin uzunluğu veya base64 boyutu kontrolü (Firestore limiti önlemi)
+            if (state.form.content.length > 800000) {
+                showToast("Dosya boyutu çok büyük (Maks ~800KB)", "error");
+                return;
+            }
+
+            state.isSaving = true;
+            els.saveBtn.innerHTML = '<i class="ph ph-spinner-gap animate-spin text-lg"></i> Kaydediliyor';
+            
+            try {
+                const documentId = state.activeDoc ? state.activeDoc.id : crypto.randomUUID();
+                const docRef = doc(db, 'artifacts', appId, 'users', state.user.uid, 'text_data', documentId);
+                
+                const saveData = {
+                    name: nameVal,
+                    fileType: state.form.fileType,
+                    content: state.form.content,
+                    updatedAt: Date.now()
+                };
+                
+                await setDoc(docRef, saveData);
+                showToast("Başarıyla kaydedildi");
+                
+                if (!state.activeDoc) {
+                    state.activeDoc = { id: documentId, ...saveData };
+                }
+            } catch (error) {
+                showToast("Kaydedilemedi", "error");
+            } finally {
+                state.isSaving = false;
+                els.saveBtn.innerHTML = '<i class="ph ph-floppy-disk text-lg"></i> Kaydet';
+            }
+        });
+
+        // Dosya Yükleme İşlemleri
+        els.uploadBtn.addEventListener('click', () => els.fileInput.click());
+        
+        els.fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 800 * 1024) {
+                showToast("Dosya çok büyük. Maksimum 800KB yüklenebilir.", "error");
+                e.target.value = '';
+                return;
+            }
+
+            const isText = file.type === 'text/plain' || file.name.endsWith('.txt');
+            const reader = new FileReader();
+
+            reader.onload = (evt) => {
+                state.form.name = file.name;
+                state.form.content = evt.target.result;
+                state.form.fileType = file.type || (isText ? 'text/plain' : 'application/octet-stream');
+                state.activeDoc = null; // Yeni dosya olarak işaretle
+                
+                renderMain();
+                showToast("Dosya okundu. Lütfen kaydedin.");
+            };
+
+            if (isText) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsDataURL(file);
+            }
+            e.target.value = '';
+        });
+
+        // Arayüz Çizimi: Sol Menü
+        function renderSidebar() {
+            if (state.documents.length === 0) {
+                els.docList.innerHTML = `
+                    <div class="text-center p-6 border border-slate-800 border-dashed rounded-xl mt-4">
+                        <i class="ph ph-file-dashed text-3xl text-slate-600 mb-2"></i>
+                        <p class="text-sm text-slate-500">Henüz kayıt yok.</p>
+                    </div>`;
+                return;
+            }
+
+            els.docList.innerHTML = state.documents.map(doc => {
+                const isActive = state.activeDoc && state.activeDoc.id === doc.id;
+                const isRealFile = doc.content && doc.content.startsWith('data:');
+                const icon = isRealFile ? 'ph-file-pdf' : 'ph-file-text';
+                const iconColor = isRealFile ? 'text-green-400' : 'text-blue-400';
+                
+                return `
+                <div onclick="selectDoc('${doc.id}')" class="group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${isActive ? 'bg-blue-900/20 border-blue-500/50' : 'bg-slate-800/30 border-slate-800 hover:bg-slate-800 hover:border-slate-700'}">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shrink-0 border border-slate-700">
+                            <i class="ph ${icon} ${iconColor} text-lg"></i>
+                        </div>
+                        <span class="truncate font-medium text-sm text-slate-200">${doc.name}</span>
+                    </div>
+                    <button onclick="deleteDoc('${doc.id}', event)" class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors md:opacity-0 md:group-hover:opacity-100">
+                        <i class="ph ph-trash"></i>
+                    </button>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // Arayüz Çizimi: Ana Ekran (Editör/Önizleme)
+        function renderMain() {
+            els.docNameInput.value = state.form.name;
+            const isRealFile = state.form.content && state.form.content.startsWith('data:');
+            
+            if (!isRealFile) {
+                // Metin Editörü Modu
+                els.editorContainer.innerHTML = `
+                    <div class="h-full flex flex-col bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                        <div class="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center gap-2">
+                            <i class="ph ph-text-aa text-slate-400"></i>
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Metin Düzenleyici</span>
+                        </div>
+                        <textarea id="text-editor" placeholder="Notlarınızı buraya yazın..." class="flex-1 w-full p-4 md:p-6 bg-transparent text-slate-200 resize-none focus:outline-none text-sm md:text-base leading-relaxed">${state.form.content}</textarea>
+                    </div>
+                `;
+            } else {
+                // Dosya Önizleme / İndirme Modu
+                let previewHtml = '';
+                
+                if (state.form.fileType === 'application/pdf') {
+                    previewHtml = `<iframe src="${state.form.content}" class="w-full h-[50vh] md:h-full rounded-xl bg-white border border-slate-800"></iframe>`;
+                } else if (state.form.fileType.startsWith('image/')) {
+                    previewHtml = `<div class="w-full h-full flex items-center justify-center bg-slate-900/50 rounded-xl border border-slate-800 p-4">
+                        <img src="${state.form.content}" class="max-w-full max-h-[50vh] md:max-h-full object-contain rounded-lg shadow-lg">
+                    </div>`;
+                } else {
+                    previewHtml = `<div class="h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/30 rounded-xl border border-slate-800 p-8 text-center">
+                        <i class="ph ph-file-dashed text-5xl mb-3 opacity-30 text-blue-400"></i>
+                        <p class="font-medium text-slate-300">Bu dosya türü için canlı önizleme desteklenmiyor.</p>
+                        <p class="text-sm mt-2 opacity-70">Dosyayı cihazınıza indirip görüntüleyebilirsiniz.</p>
+                    </div>`;
+                }
+
+                els.editorContainer.innerHTML = `
+                    <div class="h-full flex flex-col md:flex-row gap-4 md:gap-6">
+                        <!-- Dosya Bilgi ve İndirme Kartı -->
+                        <div class="w-full md:w-1/3 flex flex-col items-center justify-center border border-slate-800 rounded-2xl bg-slate-900/40 p-6 shrink-0 h-fit">
+                            <div class="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-4 border border-blue-500/20">
+                               <i class="ph ph-download-simple text-4xl text-blue-500"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2 text-center break-all">${state.form.name || 'İsimsiz Dosya'}</h3>
+                            <p class="text-sm text-slate-400 mb-6 text-center">
+                                Bu dosya güvenli veritabanı altyapısında saklanmaktadır.
+                            </p>
+                            <a href="${state.form.content}" download="${state.form.name}" class="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/20 font-medium">
+                               <i class="ph ph-download-simple text-lg"></i> Cihaza İndir
+                            </a>
+                        </div>
+                        
+                        <!-- Önizleme Kartı -->
+                        <div class="flex-1 min-h-[300px]">
+                            ${previewHtml}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Başlangıç Kurulumu
+        renderMain(); // Boş editör ile başlat
+        initAuth();
+
+    </script>
+</body>
+</html>
