@@ -146,33 +146,8 @@
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Güvenli Anahtar
-        const k1 = "f3d3a00711c2";
-        const k2 = "42d0f85f0247";
-        const k3 = "d584929d1551";
-        const k4 = "2ddb  firebase-";
-        const k5 = "adminsdk-fbsvc";
-        const k6 = "@depolama-1270b.iam.gserviceaccount.com";
-        const adminSvcKey = k1 + k2 + k3 + k4 + k5 + k6;
-
-        let firebaseConfig = {};
-        try {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                firebaseConfig = JSON.parse(__firebase_config);
-            }
-        } catch (e) {
-            console.error("Ayar okuma hatası:", e);
-        }
-
-        // Uygulamanın API hatası verip çökmesini engellemek için güvenlik yedeği
-        if (!firebaseConfig.apiKey) {
-            firebaseConfig = {
-                apiKey: "AIzaSy_yedek_anahtar",
-                authDomain: "yedek.firebaseapp.com",
-                projectId: "yedek-proje"
-            };
-        }
-
+        // Firebase Ayarları doğrudan platformun sağladığı yapılandırma üzerinden alınıyor.
+        const firebaseConfig = JSON.parse(__firebase_config);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'text-manager-pro-html';
         
         const app = initializeApp(firebaseConfig);
@@ -264,8 +239,8 @@
             state.form.content = newContent;
             
             closeNoteModal();
-            renderMain(); // Ekranda hemen güncel hali görünsün
-            await performSave(); // Veritabanına yaz
+            renderMain(); 
+            await performSave(); 
         };
 
         async function initAuth() {
@@ -302,7 +277,7 @@
             state.form = { name: '', content: '', fileType: 'text/plain' };
             renderMain();
             toggleSidebar(true);
-            openNoteModal(); // Yeni tıklandığında hemen yazma penceresi açılır!
+            openNoteModal(); 
         }
 
         els.mobileNewBtn.addEventListener('click', handleNew);
@@ -336,7 +311,6 @@
             }
         };
 
-        // Gerçek Veritabanı Kayıt Fonksiyonu
         async function performSave() {
             if (!state.user) return;
             const nameVal = state.form.name;
@@ -376,7 +350,6 @@
             }
         }
 
-        // Üst Bardaki Kaydet Butonu (Sadece dosyalar için kullanılır)
         els.saveBtn.addEventListener('click', () => {
             state.form.name = els.docNameInput.value.trim();
             performSave();
@@ -451,12 +424,10 @@
             els.docNameInput.value = state.form.name;
             const isRealFile = state.form.content && state.form.content.startsWith('data:');
             
-            // Eğer Not ise (Dosya değilse) üst barda kaydet ve isim alanını gizle, temiz bir görüntü sağla
             if (!isRealFile) {
                 els.topbarInputWrap.classList.add('hidden');
                 els.saveBtn.classList.add('hidden');
                 
-                // BOMBOŞ EKRAN (Hiçbir seçim yokken)
                 if (!state.activeDoc && !state.form.content) {
                     els.editorContainer.innerHTML = `
                         <div class="h-full flex flex-col items-center justify-center text-slate-500">
@@ -471,7 +442,6 @@
                     return;
                 }
 
-                // NOT OKUMA EKRANI
                 els.editorContainer.innerHTML = `
                     <div class="max-w-4xl mx-auto h-full flex flex-col bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden shadow-inner p-5 md:p-8">
                         <div class="flex justify-between items-start md:items-center mb-6 border-b border-slate-800/50 pb-5 gap-4 flex-col md:flex-row">
@@ -489,7 +459,6 @@
                     </div>
                 `;
             } else {
-                // DOSYA GÖRÜNÜMÜ İSE ÜST BARI GERİ GETİR
                 els.topbarInputWrap.classList.remove('hidden');
                 els.saveBtn.classList.remove('hidden');
 
