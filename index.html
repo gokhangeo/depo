@@ -26,6 +26,18 @@
 
     <div id="toast-container" class="fixed top-4 right-4 z-[80] flex flex-col gap-2 pointer-events-none"></div>
 
+    <!-- GİRİŞ EKRANI -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
+            <i class="ph ph-folder-lock text-6xl text-blue-500 mb-4"></i>
+            <h2 class="text-2xl font-bold text-white mb-2">Pro Dosya</h2>
+            <p class="text-slate-400 mb-8">Dosyalarınıza her cihazdan ulaşabilmek için hesabınızla giriş yapın.</p>
+            <button onclick="loginWithGoogle()" class="w-full py-3 px-4 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-colors shadow-lg shadow-white/10">
+                <i class="ph ph-google-logo text-xl"></i> Google ile Giriş Yap
+            </button>
+        </div>
+    </div>
+
     <!-- NOT DÜZENLEME PENCERESİ -->
     <div id="note-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeNoteModal()"></div>
@@ -81,9 +93,22 @@
                 <i class="ph ph-folder-notch-open text-2xl"></i>
                 <h1 class="font-bold text-lg">Pro Dosya</h1>
             </div>
-            <button id="desktop-new-btn" class="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all flex items-center gap-1 text-sm font-medium shadow-lg shadow-blue-500/20">
-                <i class="ph ph-plus"></i> Yeni
-            </button>
+            <div class="flex items-center gap-2">
+                <button id="desktop-new-btn" class="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all flex items-center gap-1 text-sm font-medium shadow-lg shadow-blue-500/20">
+                    <i class="ph ph-plus"></i> Yeni
+                </button>
+                <button onclick="logout()" class="p-2 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-lg transition-colors" title="Çıkış Yap">
+                    <i class="ph ph-sign-out text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Kullanıcı Bilgisi -->
+        <div id="user-info" class="p-3 mx-4 mt-4 bg-slate-800/50 rounded-xl text-xs text-slate-400 flex items-center gap-2 border border-slate-700/50 hidden">
+            <div class="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                <i class="ph ph-user"></i>
+            </div>
+            <span id="user-email" class="truncate font-medium"></span>
         </div>
 
         <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-2">
@@ -115,11 +140,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =========================================================================
-        // Şifrenizi güvenli görünmesi için parçalara böldük
         // =========================================================================
         const a1 = "AIzaSy";
         const a2 = "CDtjM2";
@@ -179,7 +202,10 @@
             toastContainer: document.getElementById('toast-container'),
             noteModal: document.getElementById('note-modal'),
             modalTitleInput: document.getElementById('modal-title-input'),
-            modalTextEditor: document.getElementById('modal-text-editor')
+            modalTextEditor: document.getElementById('modal-text-editor'),
+            loginScreen: document.getElementById('login-screen'),
+            userInfo: document.getElementById('user-info'),
+            userEmail: document.getElementById('user-email')
         };
 
         function showToast(message, type = 'success') {
@@ -193,14 +219,6 @@
                 toast.classList.replace('toast-enter', 'toast-exit');
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
-        }
-
-        function checkFirebase() {
-            if (!isFirebaseReady) {
-                showToast("Bulut bağlantısı yok!", "error");
-                return false;
-            }
-            return true;
         }
 
         function toggleSidebar(forceClose = false) {
@@ -228,7 +246,7 @@
         };
 
         window.saveNoteFromModal = async function() {
-            if (!checkFirebase()) return;
+            if (!state.user) return;
             const newName = els.modalTitleInput.value.trim();
             const newContent = els.modalTextEditor.value;
 
@@ -243,32 +261,57 @@
             await performSave(); 
         };
 
-        async function initAuth() {
-            if (!isFirebaseReady) {
-                renderSidebar();
-                return;
+        // --- GİRİŞ VE ÇIKIŞ İŞLEMLERİ ---
+        const provider = new GoogleAuthProvider();
+
+        window.loginWithGoogle = async function() {
+            try {
+                await signInWithPopup(auth, provider);
+                showToast("Giriş başarılı");
+            } catch (error) {
+                console.error("Giriş hatası:", error);
+                showToast("Firebase'den Google Girişini açmayı unutmayın!", "error");
             }
+        };
+
+        window.logout = async function() {
+            if(confirm("Çıkış yapmak istediğinize emin misiniz?")) {
+                await signOut(auth);
+                state.documents = [];
+                state.activeDoc = null;
+                els.userInfo.classList.add('hidden');
+                renderSidebar();
+                renderMain();
+                showToast("Çıkış yapıldı");
+            }
+        };
+
+        async function initAuth() {
+            if (!isFirebaseReady) return;
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
                 }
             } catch (error) {
                 console.error(error);
-                showToast("Firebase Anonim Giriş kapalı!", "error");
-                els.docList.innerHTML = `
-                    <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
-                        <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
-                        <p class="text-sm text-red-400">Bağlantı reddedildi.<br>Firebase'den 'Anonymous' girişi açın.</p>
-                    </div>`;
             }
         }
 
         if (isFirebaseReady) {
             onAuthStateChanged(auth, (user) => {
                 state.user = user;
-                if (user) loadDocuments();
+                if (user) {
+                    els.loginScreen.classList.add('hidden');
+                    
+                    if(user.email) {
+                        els.userEmail.innerText = user.email;
+                        els.userInfo.classList.remove('hidden');
+                    }
+                    
+                    loadDocuments();
+                } else {
+                    els.loginScreen.classList.remove('hidden');
+                }
             });
         }
 
@@ -308,7 +351,7 @@
 
         window.deleteDoc = async function(id, event) {
             event.stopPropagation();
-            if (!checkFirebase() || !state.user) return;
+            if (!state.user) return;
             if (!confirm("Bu öğeyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
             
             try {
@@ -325,7 +368,7 @@
         };
 
         async function performSave() {
-            if (!checkFirebase() || !state.user) return;
+            if (!state.user) return;
             const nameVal = state.form.name;
 
             if (!nameVal) return showToast("Lütfen bir isim verin", "error");
@@ -398,15 +441,6 @@
         });
 
         function renderSidebar() {
-            if (!isFirebaseReady) {
-                 els.docList.innerHTML = `
-                    <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
-                        <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
-                        <p class="text-sm text-red-400">Bulut bağlantı hatası.</p>
-                    </div>`;
-                 return;
-            }
-
             if (state.documents.length === 0) {
                 els.docList.innerHTML = `
                     <div class="text-center p-6 border border-slate-800 border-dashed rounded-xl mt-4">
