@@ -26,15 +26,26 @@
 
     <div id="toast-container" class="fixed top-4 right-4 z-[80] flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- GİRİŞ EKRANI -->
+    <!-- GİRİŞ VE KAYIT EKRANI -->
     <div id="login-screen" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
-            <i class="ph ph-folder-lock text-6xl text-blue-500 mb-4"></i>
+            <i class="ph ph-cloud-arrow-up text-6xl text-blue-500 mb-4"></i>
             <h2 class="text-2xl font-bold text-white mb-2">Pro Dosya</h2>
-            <p class="text-slate-400 mb-8">Dosyalarınıza her cihazdan ulaşabilmek için hesabınızla giriş yapın.</p>
-            <button onclick="loginWithGoogle()" class="w-full py-3 px-4 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-200 transition-colors shadow-lg shadow-white/10">
-                <i class="ph ph-google-logo text-xl"></i> Google ile Giriş Yap
-            </button>
+            <p class="text-slate-400 mb-6 text-sm">Dosyalarınıza her cihazdan ulaşmak için hesabınızla giriş yapın veya kayıt olun.</p>
+            
+            <div class="flex flex-col gap-3 mb-6">
+                <input type="email" id="auth-email" placeholder="E-posta Adresiniz" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                <input type="password" id="auth-pass" placeholder="Şifreniz" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="loginWithEmail()" class="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-500/20">
+                    Giriş Yap
+                </button>
+                <button onclick="registerWithEmail()" class="flex-1 py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors border border-slate-700">
+                    Kayıt Ol
+                </button>
+            </div>
         </div>
     </div>
 
@@ -140,7 +151,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
@@ -261,16 +272,33 @@
             await performSave(); 
         };
 
-        // --- GİRİŞ VE ÇIKIŞ İŞLEMLERİ ---
-        const provider = new GoogleAuthProvider();
+        // --- E-POSTA VE ŞİFRE İLE GİRİŞ / KAYIT ---
+        window.loginWithEmail = async function() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            
+            if (!email || !pass) return showToast("Lütfen E-posta ve şifrenizi girin.", "error");
 
-        window.loginWithGoogle = async function() {
             try {
-                await signInWithPopup(auth, provider);
+                await signInWithEmailAndPassword(auth, email, pass);
                 showToast("Giriş başarılı");
             } catch (error) {
-                console.error("Giriş hatası:", error);
-                showToast("Firebase'den Google Girişini açmayı unutmayın!", "error");
+                showToast("Hatalı giriş. Şifre veya e-posta yanlış.", "error");
+            }
+        };
+
+        window.registerWithEmail = async function() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+
+            if (!email || !pass) return showToast("Lütfen E-posta ve şifrenizi girin.", "error");
+            if (pass.length < 6) return showToast("Şifreniz en az 6 karakter olmalı.", "error");
+
+            try {
+                await createUserWithEmailAndPassword(auth, email, pass);
+                showToast("Kayıt başarılı, giriş yapıldı.");
+            } catch (error) {
+                showToast("Kayıt olunamadı. Bu e-posta zaten kullanılıyor olabilir.", "error");
             }
         };
 
@@ -280,22 +308,13 @@
                 state.documents = [];
                 state.activeDoc = null;
                 els.userInfo.classList.add('hidden');
+                document.getElementById('auth-email').value = '';
+                document.getElementById('auth-pass').value = '';
                 renderSidebar();
                 renderMain();
                 showToast("Çıkış yapıldı");
             }
         };
-
-        async function initAuth() {
-            if (!isFirebaseReady) return;
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        }
 
         if (isFirebaseReady) {
             onAuthStateChanged(auth, (user) => {
@@ -552,7 +571,6 @@
         }
 
         renderMain(); 
-        initAuth();
 
     </script>
 </body>
