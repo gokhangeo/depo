@@ -119,18 +119,18 @@
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
-        // Tüm bilgiler entegre edildi. 
+        // Firebase Ayarları
         // =========================================================================
         let firebaseConfig = {
-            apiKey: "lAulo8qWh7zV74vRDttpAlf0rvwovVGdXnZRxMOM",
+            apiKey: "AIzaSyCDtjM2BxrUL5XXNi4iOLkkKC683cAzQcI",
             authDomain: "depolama-1270b.firebaseapp.com",
+            databaseURL: "https://depolama-1270b-default-rtdb.firebaseio.com",
             projectId: "depolama-1270b",
-            storageBucket: "depolama-1270b.appspot.com",
-            messagingSenderId: "",
-            appId: ""
+            storageBucket: "depolama-1270b.firebasestorage.app",
+            messagingSenderId: "653327617266",
+            appId: "1:653327617266:web:353b1fa71e45eaa189546b"
         };
 
-        // Eğer platform otomatik ayar gönderiyorsa onu kullan
         if (typeof __firebase_config !== 'undefined' && __firebase_config) {
             try { firebaseConfig = JSON.parse(__firebase_config); } catch(e) {}
         }
@@ -140,7 +140,8 @@
         let app, auth, db;
         let isFirebaseReady = false;
 
-        if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "") {
+        // Geçersiz veya boş bir anahtar varsa çökmesini engelliyoruz
+        if (firebaseConfig.apiKey && firebaseConfig.apiKey.startsWith("AIza")) {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
@@ -189,7 +190,7 @@
 
         function checkFirebase() {
             if (!isFirebaseReady) {
-                showToast("Bulut bağlantısı yok!", "error");
+                showToast("Bulut bağlantısı yok! Lütfen 'AIza...' şifresini koda ekleyin.", "error");
                 return false;
             }
             return true;
@@ -389,7 +390,7 @@
                  els.docList.innerHTML = `
                     <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
                         <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
-                        <p class="text-sm text-red-400">Bulut bağlantı hatası.</p>
+                        <p class="text-sm text-red-400">Bulut bağlantısı yok.<br>Kod içine AIza şifresini girin.</p>
                     </div>`;
                  return;
             }
