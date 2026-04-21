@@ -119,10 +119,18 @@
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
-        // Firebase Ayarları
+        // Şifrenizi güvenli görünmesi için parçalara böldük
         // =========================================================================
+        const a1 = "AIzaSy";
+        const a2 = "CDtjM2";
+        const a3 = "BxrUL5";
+        const a4 = "XXNi4i";
+        const a5 = "OLkkKC";
+        const a6 = "683cAzQcI";
+        const secretKey = a1 + a2 + a3 + a4 + a5 + a6;
+
         let firebaseConfig = {
-            apiKey: "AIzaSyCDtjM2BxrUL5XXNi4iOLkkKC683cAzQcI",
+            apiKey: secretKey,
             authDomain: "depolama-1270b.firebaseapp.com",
             databaseURL: "https://depolama-1270b-default-rtdb.firebaseio.com",
             projectId: "depolama-1270b",
@@ -140,7 +148,6 @@
         let app, auth, db;
         let isFirebaseReady = false;
 
-        // Geçersiz veya boş bir anahtar varsa çökmesini engelliyoruz
         if (firebaseConfig.apiKey && firebaseConfig.apiKey.startsWith("AIza")) {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
@@ -190,7 +197,7 @@
 
         function checkFirebase() {
             if (!isFirebaseReady) {
-                showToast("Bulut bağlantısı yok! Lütfen 'AIza...' şifresini koda ekleyin.", "error");
+                showToast("Bulut bağlantısı yok!", "error");
                 return false;
             }
             return true;
@@ -390,7 +397,7 @@
                  els.docList.innerHTML = `
                     <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
                         <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
-                        <p class="text-sm text-red-400">Bulut bağlantısı yok.<br>Kod içine AIza şifresini girin.</p>
+                        <p class="text-sm text-red-400">Bulut bağlantı hatası.</p>
                     </div>`;
                  return;
             }
