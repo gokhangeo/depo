@@ -31,7 +31,7 @@
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
             <i class="ph ph-cloud-arrow-up text-6xl text-blue-500 mb-4"></i>
             <h2 class="text-2xl font-bold text-white mb-2">Pro Dosya</h2>
-            <p class="text-slate-400 mb-6 text-sm">Dosyalarınıza her cihazdan ulaşmak için hesabınızla giriş yapın veya kayıt olun.</p>
+            <p class="text-slate-400 mb-6 text-sm">Eski evraklarınıza her cihazdan güvenle ulaşmak için giriş yapın.</p>
             
             <div class="flex flex-col gap-3 mb-6">
                 <input type="email" id="auth-email" placeholder="E-posta Adresiniz" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
@@ -114,23 +114,20 @@
             </div>
         </div>
 
-        <!-- Kullanıcı Bilgisi -->
-        <div id="user-info" class="p-3 mx-4 mt-4 bg-slate-800/50 rounded-xl text-xs text-slate-400 flex items-center gap-2 border border-slate-700/50 hidden">
-            <div class="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                <i class="ph ph-user"></i>
-            </div>
-            <span id="user-email" class="truncate font-medium"></span>
-        </div>
-
         <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-2">
             <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Belgeleriniz</h2>
-            <div id="document-list" class="flex flex-col gap-2"></div>
+            <div id="document-list" class="flex flex-col gap-2">
+                <div class="text-center p-6 border border-slate-800 rounded-xl">
+                    <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i>
+                    <p class="text-sm text-slate-400">Bağlanıyor...</p>
+                </div>
+            </div>
         </div>
     </aside>
 
     <!-- ANA İÇERİK -->
-    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
-        <div class="p-3 md:p-4 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-3 items-center justify-between z-10 shrink-0">
+    <main class="flex-1 flex flex-col h-full overflow-x-hidden overflow-y-auto bg-slate-950 relative">
+        <div class="p-3 md:p-4 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-3 items-center justify-between z-10 shrink-0 sticky top-0">
             <div id="topbar-input-wrap" class="flex-1 min-w-[150px]">
                 <input type="text" id="doc-name-input" placeholder="Dosya İsmi (Örn: Rapor)" class="w-full bg-slate-950 border border-slate-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg focus:outline-none focus:border-blue-500 transition-all font-medium text-sm md:text-base">
             </div>
@@ -146,7 +143,7 @@
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6" id="editor-container"></div>
+        <div class="p-3 md:p-6" id="editor-container"></div>
     </main>
 
     <script type="module">
@@ -154,7 +151,6 @@
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =========================================================================
         const a1 = "AIzaSy";
         const a2 = "CDtjM2";
         const a3 = "BxrUL5";
@@ -190,11 +186,11 @@
         }
 
         let state = {
-            user: null,
             documents: [],
             activeDoc: null,
             form: { name: '', content: '', fileType: 'text/plain' },
-            isSaving: false
+            isSaving: false,
+            user: null
         };
 
         const els = {
@@ -214,9 +210,7 @@
             noteModal: document.getElementById('note-modal'),
             modalTitleInput: document.getElementById('modal-title-input'),
             modalTextEditor: document.getElementById('modal-text-editor'),
-            loginScreen: document.getElementById('login-screen'),
-            userInfo: document.getElementById('user-info'),
-            userEmail: document.getElementById('user-email')
+            loginScreen: document.getElementById('login-screen')
         };
 
         function showToast(message, type = 'success') {
@@ -257,7 +251,6 @@
         };
 
         window.saveNoteFromModal = async function() {
-            if (!state.user) return;
             const newName = els.modalTitleInput.value.trim();
             const newContent = els.modalTextEditor.value;
 
@@ -268,22 +261,39 @@
             state.form.content = newContent;
             
             closeNoteModal();
-            renderMain(); 
             await performSave(); 
         };
 
-        // --- E-POSTA VE ŞİFRE İLE GİRİŞ / KAYIT ---
+        window.shareDoc = function() {
+            if (!state.activeDoc) return;
+            
+            const isRealFile = state.form.content && state.form.content.startsWith('data:');
+            const shareTitle = state.form.name;
+            const shareText = isRealFile ? "Dosya: " + state.form.name : state.form.content;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: shareTitle,
+                    text: shareText
+                }).catch(err => console.error("Paylaşım iptal edildi veya desteklenmiyor.", err));
+            } else {
+                navigator.clipboard.writeText(shareText);
+                showToast("Metin kopyalandı!");
+            }
+        };
+
+        // --- GİRİŞ / ÇIKIŞ İŞLEMLERİ ---
         window.loginWithEmail = async function() {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
             
-            if (!email || !pass) return showToast("Lütfen E-posta ve şifrenizi girin.", "error");
+            if (!email || !pass) return showToast("E-posta ve şifrenizi girin.", "error");
 
             try {
                 await signInWithEmailAndPassword(auth, email, pass);
-                showToast("Giriş başarılı");
+                showToast("Giriş başarılı, dosyalarınız yükleniyor.");
             } catch (error) {
-                showToast("Hatalı giriş. Şifre veya e-posta yanlış.", "error");
+                showToast("Şifre veya e-posta yanlış.", "error");
             }
         };
 
@@ -291,14 +301,14 @@
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
 
-            if (!email || !pass) return showToast("Lütfen E-posta ve şifrenizi girin.", "error");
-            if (pass.length < 6) return showToast("Şifreniz en az 6 karakter olmalı.", "error");
+            if (!email || !pass) return showToast("E-posta ve şifrenizi girin.", "error");
+            if (pass.length < 6) return showToast("Şifre en az 6 karakter olmalı.", "error");
 
             try {
                 await createUserWithEmailAndPassword(auth, email, pass);
-                showToast("Kayıt başarılı, giriş yapıldı.");
+                showToast("Kayıt başarılı, sistem hazır.");
             } catch (error) {
-                showToast("Kayıt olunamadı. Bu e-posta zaten kullanılıyor olabilir.", "error");
+                showToast("Kayıt olunamadı. E-posta kullanımda olabilir.", "error");
             }
         };
 
@@ -307,7 +317,6 @@
                 await signOut(auth);
                 state.documents = [];
                 state.activeDoc = null;
-                els.userInfo.classList.add('hidden');
                 document.getElementById('auth-email').value = '';
                 document.getElementById('auth-pass').value = '';
                 renderSidebar();
@@ -318,24 +327,20 @@
 
         if (isFirebaseReady) {
             onAuthStateChanged(auth, (user) => {
-                state.user = user;
                 if (user) {
+                    state.user = user;
                     els.loginScreen.classList.add('hidden');
-                    
-                    if(user.email) {
-                        els.userEmail.innerText = user.email;
-                        els.userInfo.classList.remove('hidden');
-                    }
-                    
                     loadDocuments();
                 } else {
+                    state.user = null;
                     els.loginScreen.classList.remove('hidden');
                 }
             });
         }
 
         function loadDocuments() {
-            if (!state.user || !isFirebaseReady) return;
+            if (!isFirebaseReady || !state.user) return;
+            // Önceki Özel/Kişisel dizininize (users -> uid) geri döndük!
             const docsRef = collection(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data');
             
             onSnapshot(docsRef, (snapshot) => {
@@ -343,6 +348,9 @@
                 snapshot.forEach((doc) => state.documents.push({ id: doc.id, ...doc.data() }));
                 state.documents.sort((a, b) => b.updatedAt - a.updatedAt);
                 renderSidebar();
+            }, (error) => {
+                console.error(error);
+                showToast("Dosyalar yüklenirken hata oluştu.", "error");
             });
         }
 
@@ -370,8 +378,8 @@
 
         window.deleteDoc = async function(id, event) {
             event.stopPropagation();
-            if (!state.user) return;
             if (!confirm("Bu öğeyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
+            if (!state.user) return;
             
             try {
                 await deleteDoc(doc(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data', id));
@@ -387,10 +395,9 @@
         };
 
         async function performSave() {
-            if (!state.user) return;
             const nameVal = state.form.name;
-
             if (!nameVal) return showToast("Lütfen bir isim verin", "error");
+            if (!state.user) return showToast("Kaydetmek için giriş yapmalısınız.", "error");
 
             state.isSaving = true;
             const origHtml = els.saveBtn.innerHTML;
@@ -408,12 +415,13 @@
                 };
                 
                 await setDoc(docRef, saveData);
-                showToast("Buluta başarıyla kaydedildi");
+                showToast("Güvenle kaydedildi");
                 
-                if (!state.activeDoc) {
-                    state.activeDoc = { id: documentId, ...saveData };
-                    renderSidebar();
-                }
+                state.activeDoc = null;
+                state.form = { name: '', content: '', fileType: 'text/plain' };
+                renderSidebar();
+                renderMain();
+
             } catch (error) {
                 showToast("Kaydedilemedi", "error");
             } finally {
@@ -460,6 +468,15 @@
         });
 
         function renderSidebar() {
+            if (!isFirebaseReady) {
+                 els.docList.innerHTML = `
+                    <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
+                        <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
+                        <p class="text-sm text-red-400">Bağlantı hatası.</p>
+                    </div>`;
+                 return;
+            }
+
             if (state.documents.length === 0) {
                 els.docList.innerHTML = `
                     <div class="text-center p-6 border border-slate-800 border-dashed rounded-xl mt-4">
@@ -501,10 +518,10 @@
                 
                 if (!state.activeDoc && !state.form.content) {
                     els.editorContainer.innerHTML = `
-                        <div class="h-full flex flex-col items-center justify-center text-slate-500">
-                            <i class="ph ph-cloud-arrow-up text-6xl mb-4 text-blue-500/30"></i>
-                            <h2 class="text-xl font-medium text-slate-300 mb-2">Bulut Çalışma Alanı</h2>
-                            <p class="text-sm mb-6 text-center max-w-sm">Sol menüden bir belge seçin veya buluta yüklemek için yeni bir not oluşturun.</p>
+                        <div class="h-full flex flex-col items-center justify-center text-slate-500 py-20">
+                            <i class="ph ph-files text-6xl mb-4 text-blue-500/30"></i>
+                            <h2 class="text-xl font-medium text-slate-300 mb-2">Sistem Hazır</h2>
+                            <p class="text-sm mb-6 text-center max-w-sm">Sol menüden bir belge seçebilir veya yeni bir not oluşturabilirsiniz.</p>
                             <button onclick="handleNew()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-500/20 font-medium transition-colors flex items-center gap-2">
                                 <i class="ph ph-plus"></i> Yeni Not Oluştur
                             </button>
@@ -514,17 +531,22 @@
                 }
 
                 els.editorContainer.innerHTML = `
-                    <div class="max-w-4xl mx-auto h-full flex flex-col bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden shadow-inner p-5 md:p-8">
+                    <div class="max-w-2xl mx-auto h-auto min-h-[300px] flex flex-col bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden p-5 md:p-6 mb-8">
                         <div class="flex justify-between items-start md:items-center mb-6 border-b border-slate-800/50 pb-5 gap-4 flex-col md:flex-row">
-                            <h2 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
-                                <div class="p-2 bg-blue-500/10 rounded-xl text-blue-400 border border-blue-500/20"><i class="ph ph-text-aa text-xl"></i></div>
+                            <h2 class="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+                                <div class="p-2 bg-blue-500/10 rounded-xl text-blue-400 border border-blue-500/20"><i class="ph ph-text-aa text-lg"></i></div>
                                 ${state.form.name || 'İsimsiz Not'}
                             </h2>
-                            <button onclick="openNoteModal()" class="w-full md:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm text-white flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-500/20 transition-all shrink-0">
-                                <i class="ph ph-pencil-simple text-lg"></i> Notu Düzenle
-                            </button>
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <button onclick="shareDoc()" class="flex-1 md:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm text-white flex items-center justify-center gap-2 font-medium transition-all shrink-0">
+                                    <i class="ph ph-share-network text-lg"></i> Paylaş
+                                </button>
+                                <button onclick="openNoteModal()" class="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm text-white flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-500/20 transition-all shrink-0">
+                                    <i class="ph ph-pencil-simple text-lg"></i> Düzenle
+                                </button>
+                            </div>
                         </div>
-                        <div class="flex-1 overflow-y-auto text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed pr-2">
+                        <div class="flex-1 text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed pr-2 break-words">
                             ${state.form.content || '<span class="text-slate-500 italic">Bu not boş.</span>'}
                         </div>
                     </div>
@@ -542,27 +564,29 @@
                         <img src="${state.form.content}" class="max-w-full max-h-[50vh] md:max-h-full object-contain rounded-lg shadow-lg">
                     </div>`;
                 } else {
-                    previewHtml = `<div class="h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/30 rounded-xl border border-slate-800 p-8 text-center">
+                    previewHtml = `<div class="h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/30 rounded-xl border border-slate-800 p-8 text-center min-h-[300px]">
                         <i class="ph ph-file-dashed text-6xl mb-4 opacity-30 text-emerald-400"></i>
                         <p class="font-medium text-slate-300 text-lg">Önizleme Desteklenmiyor</p>
                     </div>`;
                 }
 
                 els.editorContainer.innerHTML = `
-                    <div class="h-full flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto w-full">
-                        <div class="w-full lg:w-80 flex flex-col items-center justify-center border border-slate-800 rounded-2xl bg-slate-900/40 p-8 shrink-0 h-fit shadow-xl">
-                            <div class="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20">
-                               <i class="ph ph-download-simple text-5xl text-emerald-500"></i>
+                    <div class="max-w-3xl mx-auto h-auto flex flex-col lg:flex-row gap-6 w-full">
+                        <div class="w-full lg:w-72 flex flex-col items-center justify-center border border-slate-800 rounded-2xl bg-slate-900/40 p-6 shrink-0 h-fit shadow-xl">
+                            <div class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20">
+                               <i class="ph ph-file text-4xl text-emerald-500"></i>
                             </div>
-                            <h3 class="text-xl font-bold text-white mb-2 text-center break-all">${state.form.name || 'İsimsiz Dosya'}</h3>
-                            <p class="text-sm text-slate-400 mb-8 text-center leading-relaxed">
-                                Bu dosya bulut veritabanınızda güvenle saklanmaktadır.
-                            </p>
-                            <a href="${state.form.content}" download="${state.form.name}" class="w-full flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-lg shadow-emerald-500/20 font-bold text-lg">
-                               <i class="ph ph-download-simple text-xl"></i> Cihaza İndir
-                            </a>
+                            <h3 class="text-lg font-bold text-white mb-2 text-center break-all">${state.form.name || 'İsimsiz Dosya'}</h3>
+                            <div class="flex flex-col gap-2 w-full mt-4">
+                                <button onclick="shareDoc()" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all font-medium">
+                                    <i class="ph ph-share-network text-lg"></i> Paylaş
+                                </button>
+                                <a href="${state.form.content}" download="${state.form.name}" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-lg shadow-emerald-500/20 font-bold">
+                                   <i class="ph ph-download-simple text-lg"></i> İndir
+                                </a>
+                            </div>
                         </div>
-                        <div class="flex-1 min-h-[400px]">
+                        <div class="flex-1">
                             ${previewHtml}
                         </div>
                     </div>
