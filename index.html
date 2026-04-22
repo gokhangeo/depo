@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Dosya Yöneticisi</title>
+    <title>Pro Workspace</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
@@ -20,149 +20,200 @@
         .sidebar-open { transform: translateX(0); }
         .sidebar-closed { transform: translateX(-100%); }
         @media (min-width: 768px) { .sidebar-closed { transform: translateX(0); } }
+        
+        input[type="color"] { -webkit-appearance: none; border: none; padding: 0; }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-sans h-screen overflow-hidden flex flex-col md:flex-row relative">
+<body class="bg-slate-950 text-slate-200 font-sans h-screen overflow-hidden flex flex-col md:flex-row relative selection:bg-blue-500/30">
 
     <div id="toast-container" class="fixed top-4 right-4 z-[80] flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- GİRİŞ VE KAYIT EKRANI -->
     <div id="login-screen" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
-            <i class="ph ph-cloud-arrow-up text-6xl text-blue-500 mb-4"></i>
-            <h2 class="text-2xl font-bold text-white mb-2">Pro Dosya</h2>
-            <p class="text-slate-400 mb-6 text-sm">Eski evraklarınıza her cihazdan güvenle ulaşmak için giriş yapın.</p>
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-emerald-500"></div>
             
-            <div class="flex flex-col gap-3 mb-6">
-                <input type="email" id="auth-email" placeholder="E-posta Adresiniz" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
-                <input type="password" id="auth-pass" placeholder="Şifreniz" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
+                    <i class="ph-duotone ph-fingerprint text-4xl text-blue-500"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-2">Pro Workspace</h2>
+                <p class="text-slate-400 text-sm">Çalışma alanınıza güvenle erişin.</p>
+            </div>
+            
+            <div class="flex flex-col gap-4 mb-6">
+                <div class="relative">
+                    <i class="ph ph-envelope-simple absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="email" id="auth-email" placeholder="E-posta Adresiniz" class="w-full bg-slate-950 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+                <div class="relative">
+                    <i class="ph ph-lock-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="password" id="auth-pass" placeholder="Şifreniz" class="w-full bg-slate-950 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
             </div>
 
-            <div class="flex gap-3">
-                <button onclick="loginWithEmail()" class="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-500/20">
+            <div class="flex flex-col gap-3">
+                <button id="btn-login" onclick="loginWithEmail()" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/20">
                     Giriş Yap
                 </button>
-                <button onclick="registerWithEmail()" class="flex-1 py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors border border-slate-700">
-                    Kayıt Ol
+                <button id="btn-register" onclick="registerWithEmail()" class="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all hidden">
+                    Hesap Oluştur
                 </button>
+            </div>
+
+            <div class="mt-6 text-center text-sm text-slate-500">
+                <span id="auth-toggle-text">Hesabınız yok mu?</span>
+                <button onclick="toggleAuthMode()" class="text-blue-400 hover:text-blue-300 font-medium ml-1 transition-colors" id="auth-toggle-btn">Kayıt Ol</button>
             </div>
         </div>
     </div>
 
     <!-- NOT DÜZENLEME PENCERESİ -->
-    <div id="note-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeNoteModal()"></div>
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl flex flex-col shadow-2xl relative z-10 max-h-[90vh] animate-[slideIn_0.2s_ease-out]">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 rounded-t-2xl">
+    <div id="note-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeNoteModal()"></div>
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl relative z-10 h-full max-h-[90vh] animate-[slideIn_0.2s_ease-out]">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/30 rounded-t-2xl">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                    <i class="ph ph-pencil-simple text-blue-400"></i> Not Düzenle
+                    <i class="ph-duotone ph-notebook text-blue-400 text-xl"></i> Belge Düzenle
                 </h3>
                 <button onclick="closeNoteModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-700 transition-colors">
                     <i class="ph ph-x text-xl"></i>
                 </button>
             </div>
-            <div class="p-4 md:p-6 flex flex-col gap-4 overflow-y-auto">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Başlık</label>
-                    <input type="text" id="modal-title-input" placeholder="Örn: Haftalık Rapor" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 font-medium transition-colors">
+            
+            <div class="p-4 md:p-6 flex flex-col gap-5 overflow-y-auto flex-1">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Belge Başlığı</label>
+                        <input type="text" id="modal-title-input" placeholder="Örn: Haftalık Toplantı Özeti" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 font-medium transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Klasör</label>
+                        <input type="text" id="modal-folder-input" placeholder="Genel" list="folder-datalist" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors">
+                        <datalist id="folder-datalist"></datalist>
+                    </div>
                 </div>
-                <div class="flex-1 flex flex-col">
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">İçerik</label>
-                    <textarea id="modal-text-editor" placeholder="Notlarınızı buraya yazmaya başlayın..." class="w-full min-h-[250px] bg-slate-950 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 resize-none leading-relaxed transition-colors"></textarea>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-800 pt-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Etiket Rengi</label>
+                        <div class="flex items-center gap-3 bg-slate-950 border border-slate-700 p-2 rounded-xl">
+                            <input type="color" id="modal-color-input" value="#3b82f6" class="w-8 h-8 rounded-lg cursor-pointer">
+                            <span class="text-sm text-slate-400">Belgeyi renklendirin</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Son Tarih / Uyarı</label>
+                        <div class="relative">
+                            <i class="ph ph-calendar-blank absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="date" id="modal-date-input" class="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 transition-colors [color-scheme:dark]">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col pt-4 border-t border-slate-800 h-full min-h-[300px]">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">İçerik</label>
+                    <textarea id="modal-text-editor" placeholder="Notlarınızı buraya yazın..." class="w-full h-full flex-1 bg-slate-950 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 resize-none leading-relaxed transition-colors"></textarea>
                 </div>
             </div>
-            <div class="p-4 border-t border-slate-800 bg-slate-800/20 rounded-b-2xl flex justify-end gap-3">
+
+            <div class="p-4 border-t border-slate-800 bg-slate-800/30 rounded-b-2xl flex justify-end gap-3 shrink-0">
                 <button onclick="closeNoteModal()" class="px-5 py-2.5 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white font-medium transition-colors">İptal</button>
                 <button onclick="saveNoteFromModal()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
-                    <i class="ph ph-floppy-disk text-lg"></i> Kaydet
+                    <i class="ph ph-floppy-disk text-lg"></i> Değişiklikleri Kaydet
                 </button>
             </div>
         </div>
     </div>
 
     <!-- MOBİL ÜST BAR -->
-    <div class="md:hidden bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between shrink-0 z-40 relative">
+    <div class="md:hidden bg-slate-900 border-b border-slate-800 p-3 flex items-center justify-between shrink-0 z-40 relative">
         <div class="flex items-center gap-3">
-            <button id="menu-btn" class="p-1.5 bg-slate-800 rounded-lg text-slate-300 hover:text-white">
+            <button id="menu-btn" class="p-2 bg-slate-800 rounded-lg text-slate-300 hover:text-white transition-colors">
                 <i class="ph ph-list text-xl"></i>
             </button>
-            <div class="font-bold text-lg text-blue-400 flex items-center gap-2">
-                <i class="ph ph-folder-notch-open"></i> Pro Dosya
+            <div class="font-bold text-lg text-white flex items-center gap-2">
+                <i class="ph-duotone ph-folders text-blue-500"></i> Pro
             </div>
         </div>
         <button id="mobile-new-btn" class="p-2 bg-blue-600 text-white rounded-lg flex items-center gap-1 text-sm font-medium shadow-lg shadow-blue-500/20">
-            <i class="ph ph-plus"></i> Yeni Not
+            <i class="ph ph-plus text-lg"></i>
         </button>
     </div>
 
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden md:hidden backdrop-blur-sm"></div>
 
     <!-- SOL MENÜ -->
-    <aside id="sidebar" class="sidebar-closed absolute md:relative z-50 w-3/4 max-w-sm md:w-80 h-full bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 shadow-2xl md:shadow-none">
-        <div class="hidden md:flex p-4 border-b border-slate-800 items-center justify-between">
-            <div class="flex items-center gap-2 text-blue-400">
-                <i class="ph ph-folder-notch-open text-2xl"></i>
-                <h1 class="font-bold text-lg">Pro Dosya</h1>
+    <aside id="sidebar" class="sidebar-closed absolute md:relative z-50 w-4/5 max-w-xs md:w-80 h-full bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 shadow-2xl md:shadow-none">
+        <div class="hidden md:flex p-4 border-b border-slate-800 items-center justify-between bg-slate-900/50">
+            <div class="flex items-center gap-2 text-white">
+                <i class="ph-duotone ph-folders text-3xl text-blue-500"></i>
+                <h1 class="font-bold text-xl tracking-tight">Pro Workspace</h1>
             </div>
-            <div class="flex items-center gap-2">
-                <button id="desktop-new-btn" class="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all flex items-center gap-1 text-sm font-medium shadow-lg shadow-blue-500/20">
-                    <i class="ph ph-plus"></i> Yeni
-                </button>
-                <button onclick="logout()" class="p-2 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-lg transition-colors" title="Çıkış Yap">
-                    <i class="ph ph-sign-out text-lg"></i>
-                </button>
+            <button id="desktop-new-btn" class="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all flex items-center justify-center shadow-lg shadow-blue-500/20" title="Yeni Belge">
+                <i class="ph ph-plus text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-4 flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-6">
+            <div id="document-list" class="flex flex-col gap-6">
+                <!-- Klasörler ve Dosyalar buraya gelecek -->
             </div>
         </div>
 
-        <div class="p-4 flex-1 overflow-y-auto flex flex-col gap-2">
-            <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Belgeleriniz</h2>
-            <div id="document-list" class="flex flex-col gap-2">
-                <div class="text-center p-6 border border-slate-800 rounded-xl">
-                    <i class="ph ph-spinner-gap animate-spin text-2xl text-blue-500 mb-2"></i>
-                    <p class="text-sm text-slate-400">Bağlanıyor...</p>
+        <div id="user-info" class="p-4 bg-slate-950/50 border-t border-slate-800 flex items-center justify-between hidden">
+            <div class="flex items-center gap-3 overflow-hidden">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-500 flex items-center justify-center text-white shrink-0">
+                    <i class="ph ph-user font-bold"></i>
+                </div>
+                <div class="flex flex-col overflow-hidden">
+                    <span class="text-xs text-slate-500 font-semibold uppercase">Oturum Açık</span>
+                    <span id="user-email" class="text-sm font-medium text-slate-300 truncate"></span>
                 </div>
             </div>
+            <button onclick="logout()" class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors shrink-0" title="Çıkış Yap">
+                <i class="ph ph-sign-out text-xl"></i>
+            </button>
         </div>
     </aside>
 
     <!-- ANA İÇERİK -->
-    <main class="flex-1 flex flex-col h-full overflow-x-hidden overflow-y-auto bg-slate-950 relative">
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
         <div class="p-3 md:p-4 border-b border-slate-800 bg-slate-900/50 flex flex-wrap gap-3 items-center justify-between z-10 shrink-0 sticky top-0">
-            <div id="topbar-input-wrap" class="flex-1 min-w-[150px]">
-                <input type="text" id="doc-name-input" placeholder="Dosya İsmi (Örn: Rapor)" class="w-full bg-slate-950 border border-slate-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg focus:outline-none focus:border-blue-500 transition-all font-medium text-sm md:text-base">
+            <div id="topbar-input-wrap" class="flex-1 min-w-[200px] flex gap-2">
+                <input type="text" id="doc-name-input" placeholder="Dosya İsmi" class="w-full bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500 transition-all text-sm font-medium">
+                <input type="date" id="doc-date-input" title="Bitiş Tarihi" class="bg-slate-950 border border-slate-700 text-slate-300 px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500 transition-all text-sm [color-scheme:dark] hidden md:block">
+                <input type="text" id="doc-folder-input" placeholder="Klasör" list="folder-datalist" class="bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500 transition-all text-sm w-32 hidden md:block">
             </div>
             
-            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div class="flex items-center gap-2 w-full md:w-auto justify-end">
                 <input type="file" id="file-input" class="hidden" accept="*/*">
-                <button id="upload-btn" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 md:py-2.5 bg-slate-800 text-slate-300 rounded-lg text-sm transition-colors hover:bg-slate-700 font-medium">
-                    <i class="ph ph-upload-simple text-lg"></i> Dosya Yükle
+                <button id="upload-btn" class="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-sm transition-colors hover:bg-slate-700 font-medium">
+                    <i class="ph ph-upload-simple text-lg"></i> Yükle
                 </button>
-                <button id="save-btn" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2 md:py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors hover:bg-emerald-500 active:bg-emerald-700 shadow-lg shadow-emerald-500/20">
+                <button id="save-btn" class="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-emerald-500/20">
                     <i class="ph ph-floppy-disk text-lg"></i> Kaydet
                 </button>
             </div>
         </div>
 
-        <div class="p-3 md:p-6" id="editor-container"></div>
+        <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8" id="editor-container"></div>
     </main>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const a1 = "AIzaSy";
-        const a2 = "CDtjM2";
-        const a3 = "BxrUL5";
-        const a4 = "XXNi4i";
-        const a5 = "OLkkKC";
-        const a6 = "683cAzQcI";
+        const a1 = "AIzaSy"; const a2 = "CDtjM2"; const a3 = "BxrUL5";
+        const a4 = "XXNi4i"; const a5 = "OLkkKC"; const a6 = "683cAzQcI";
         const secretKey = a1 + a2 + a3 + a4 + a5 + a6;
 
         let firebaseConfig = {
             apiKey: secretKey,
             authDomain: "depolama-1270b.firebaseapp.com",
-            databaseURL: "https://depolama-1270b-default-rtdb.firebaseio.com",
             projectId: "depolama-1270b",
             storageBucket: "depolama-1270b.firebasestorage.app",
             messagingSenderId: "653327617266",
@@ -188,29 +239,26 @@
         let state = {
             documents: [],
             activeDoc: null,
-            form: { name: '', content: '', fileType: 'text/plain' },
+            form: { name: '', content: '', fileType: 'text/plain', folder: 'Genel', color: '#3b82f6', dueDate: '' },
             isSaving: false,
-            user: null
+            user: null,
+            isLoginMode: true
         };
 
         const els = {
-            menuBtn: document.getElementById('menu-btn'),
-            sidebar: document.getElementById('sidebar'),
-            overlay: document.getElementById('sidebar-overlay'),
-            docList: document.getElementById('document-list'),
-            docNameInput: document.getElementById('doc-name-input'),
-            topbarInputWrap: document.getElementById('topbar-input-wrap'),
-            uploadBtn: document.getElementById('upload-btn'),
-            fileInput: document.getElementById('file-input'),
-            saveBtn: document.getElementById('save-btn'),
-            editorContainer: document.getElementById('editor-container'),
-            mobileNewBtn: document.getElementById('mobile-new-btn'),
-            desktopNewBtn: document.getElementById('desktop-new-btn'),
-            toastContainer: document.getElementById('toast-container'),
-            noteModal: document.getElementById('note-modal'),
-            modalTitleInput: document.getElementById('modal-title-input'),
-            modalTextEditor: document.getElementById('modal-text-editor'),
-            loginScreen: document.getElementById('login-screen')
+            menuBtn: document.getElementById('menu-btn'), sidebar: document.getElementById('sidebar'),
+            overlay: document.getElementById('sidebar-overlay'), docList: document.getElementById('document-list'),
+            docNameInput: document.getElementById('doc-name-input'), topbarInputWrap: document.getElementById('topbar-input-wrap'),
+            uploadBtn: document.getElementById('upload-btn'), fileInput: document.getElementById('file-input'),
+            saveBtn: document.getElementById('save-btn'), editorContainer: document.getElementById('editor-container'),
+            mobileNewBtn: document.getElementById('mobile-new-btn'), desktopNewBtn: document.getElementById('desktop-new-btn'),
+            toastContainer: document.getElementById('toast-container'), noteModal: document.getElementById('note-modal'),
+            modalTitleInput: document.getElementById('modal-title-input'), modalTextEditor: document.getElementById('modal-text-editor'),
+            modalFolderInput: document.getElementById('modal-folder-input'), modalColorInput: document.getElementById('modal-color-input'),
+            modalDateInput: document.getElementById('modal-date-input'), folderDatalist: document.getElementById('folder-datalist'),
+            loginScreen: document.getElementById('login-screen'), userInfo: document.getElementById('user-info'),
+            userEmail: document.getElementById('user-email'),
+            docFolderInput: document.getElementById('doc-folder-input'), docDateInput: document.getElementById('doc-date-input')
         };
 
         function showToast(message, type = 'success') {
@@ -218,22 +266,17 @@
             const colors = type === 'error' ? 'bg-red-500/10 border border-red-500/50 text-red-400' : 'bg-emerald-500/10 border border-emerald-500/50 text-emerald-400';
             const icon = type === 'error' ? 'ph-warning-circle' : 'ph-check-circle';
             toast.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg backdrop-blur-md pointer-events-auto ${colors}`;
-            toast.innerHTML = `<i class="ph ${icon} text-xl"></i><span class="text-sm font-medium">${message}</span>`;
+            toast.innerHTML = `<i class="ph-fill ${icon} text-xl"></i><span class="text-sm font-medium">${message}</span>`;
             els.toastContainer.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.replace('toast-enter', 'toast-exit');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            setTimeout(() => { toast.classList.replace('toast-enter', 'toast-exit'); setTimeout(() => toast.remove(), 300); }, 3000);
         }
 
         function toggleSidebar(forceClose = false) {
             const isOpen = !els.sidebar.classList.contains('sidebar-closed');
             if (isOpen || forceClose) {
-                els.sidebar.classList.add('sidebar-closed');
-                els.overlay.classList.add('hidden');
+                els.sidebar.classList.add('sidebar-closed'); els.overlay.classList.add('hidden');
             } else {
-                els.sidebar.classList.remove('sidebar-closed');
-                els.overlay.classList.remove('hidden');
+                els.sidebar.classList.remove('sidebar-closed'); els.overlay.classList.remove('hidden');
             }
         }
 
@@ -243,22 +286,26 @@
         window.openNoteModal = function() {
             els.modalTitleInput.value = state.form.name || '';
             els.modalTextEditor.value = state.form.content || '';
+            els.modalFolderInput.value = state.form.folder || 'Genel';
+            els.modalColorInput.value = state.form.color || '#3b82f6';
+            els.modalDateInput.value = state.form.dueDate || '';
             els.noteModal.classList.remove('hidden');
         };
 
-        window.closeNoteModal = function() {
-            els.noteModal.classList.add('hidden');
-        };
+        window.closeNoteModal = function() { els.noteModal.classList.add('hidden'); };
 
         window.saveNoteFromModal = async function() {
             const newName = els.modalTitleInput.value.trim();
             const newContent = els.modalTextEditor.value;
 
             if (!newName) return showToast("Lütfen bir başlık girin", "error");
-            if (newContent.length > 800000) return showToast("Notunuz çok uzun (Maks ~800KB)", "error");
+            if (newContent.length > 800000) return showToast("Notunuz çok uzun", "error");
 
             state.form.name = newName;
             state.form.content = newContent;
+            state.form.folder = els.modalFolderInput.value.trim() || 'Genel';
+            state.form.color = els.modalColorInput.value || '#3b82f6';
+            state.form.dueDate = els.modalDateInput.value;
             
             closeNoteModal();
             await performSave(); 
@@ -266,100 +313,93 @@
 
         window.shareDoc = function() {
             if (!state.activeDoc) return;
-            
             const isRealFile = state.form.content && state.form.content.startsWith('data:');
-            const shareTitle = state.form.name;
             const shareText = isRealFile ? "Dosya: " + state.form.name : state.form.content;
 
             if (navigator.share) {
-                navigator.share({
-                    title: shareTitle,
-                    text: shareText
-                }).catch(err => console.error("Paylaşım iptal edildi veya desteklenmiyor.", err));
+                navigator.share({ title: state.form.name, text: shareText }).catch(err => {});
             } else {
                 navigator.clipboard.writeText(shareText);
-                showToast("Metin kopyalandı!");
+                showToast("Panoya kopyalandı!");
             }
         };
 
-        // --- GİRİŞ / ÇIKIŞ İŞLEMLERİ ---
+        // --- AUTH ---
+        window.toggleAuthMode = function() {
+            state.isLoginMode = !state.isLoginMode;
+            document.getElementById('btn-login').classList.toggle('hidden', !state.isLoginMode);
+            document.getElementById('btn-register').classList.toggle('hidden', state.isLoginMode);
+            document.getElementById('auth-toggle-text').innerText = state.isLoginMode ? "Hesabınız yok mu?" : "Zaten hesabınız var mı?";
+            document.getElementById('auth-toggle-btn').innerText = state.isLoginMode ? "Kayıt Ol" : "Giriş Yap";
+        };
+
         window.loginWithEmail = async function() {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
-            
-            if (!email || !pass) return showToast("E-posta ve şifrenizi girin.", "error");
-
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-                showToast("Giriş başarılı, dosyalarınız yükleniyor.");
-            } catch (error) {
-                showToast("Şifre veya e-posta yanlış.", "error");
-            }
+            if (!email || !pass) return showToast("Bilgileri eksiksiz girin.", "error");
+            try { await signInWithEmailAndPassword(auth, email, pass); } 
+            catch (error) { showToast("Giriş başarısız. Bilgileri kontrol edin.", "error"); }
         };
 
         window.registerWithEmail = async function() {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
-
-            if (!email || !pass) return showToast("E-posta ve şifrenizi girin.", "error");
+            if (!email || !pass) return showToast("Bilgileri eksiksiz girin.", "error");
             if (pass.length < 6) return showToast("Şifre en az 6 karakter olmalı.", "error");
-
-            try {
-                await createUserWithEmailAndPassword(auth, email, pass);
-                showToast("Kayıt başarılı, sistem hazır.");
-            } catch (error) {
-                showToast("Kayıt olunamadı. E-posta kullanımda olabilir.", "error");
-            }
+            try { await createUserWithEmailAndPassword(auth, email, pass); } 
+            catch (error) { showToast("Kayıt olunamadı.", "error"); }
         };
 
         window.logout = async function() {
             if(confirm("Çıkış yapmak istediğinize emin misiniz?")) {
                 await signOut(auth);
-                state.documents = [];
-                state.activeDoc = null;
+                state.documents = []; state.activeDoc = null;
                 document.getElementById('auth-email').value = '';
                 document.getElementById('auth-pass').value = '';
-                renderSidebar();
-                renderMain();
-                showToast("Çıkış yapıldı");
+                renderSidebar(); renderMain();
             }
         };
 
         if (isFirebaseReady) {
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    state.user = user;
-                    els.loginScreen.classList.add('hidden');
-                    loadDocuments();
-                } else {
-                    state.user = null;
-                    els.loginScreen.classList.remove('hidden');
-                }
+            // GİRİŞ HATIRLAMA (Persistence)
+            setPersistence(auth, browserLocalPersistence).then(() => {
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        state.user = user;
+                        els.loginScreen.classList.add('hidden');
+                        if(user.email) { els.userEmail.innerText = user.email; els.userInfo.classList.remove('hidden'); }
+                        loadDocuments();
+                    } else {
+                        state.user = null;
+                        els.userInfo.classList.add('hidden');
+                        els.loginScreen.classList.remove('hidden');
+                    }
+                });
             });
         }
 
         function loadDocuments() {
             if (!isFirebaseReady || !state.user) return;
-            // Önceki Özel/Kişisel dizininize (users -> uid) geri döndük!
-            const docsRef = collection(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data');
-            
+            const docsRef = collection(db, 'artifacts', app_id, 'users', state.user.uid, 'files');
             onSnapshot(docsRef, (snapshot) => {
                 state.documents = [];
                 snapshot.forEach((doc) => state.documents.push({ id: doc.id, ...doc.data() }));
                 state.documents.sort((a, b) => b.updatedAt - a.updatedAt);
+                updateFoldersDatalist();
                 renderSidebar();
-            }, (error) => {
-                console.error(error);
-                showToast("Dosyalar yüklenirken hata oluştu.", "error");
             });
+        }
+
+        function updateFoldersDatalist() {
+            const folders = new Set();
+            state.documents.forEach(d => { if(d.folder) folders.add(d.folder); });
+            els.folderDatalist.innerHTML = Array.from(folders).map(f => `<option value="${f}">`).join('');
         }
 
         function handleNew() {
             state.activeDoc = null;
-            state.form = { name: '', content: '', fileType: 'text/plain' };
-            renderMain();
-            toggleSidebar(true);
-            openNoteModal(); 
+            state.form = { name: '', content: '', fileType: 'text/plain', folder: 'Genel', color: '#3b82f6', dueDate: '' };
+            renderMain(); toggleSidebar(true); openNoteModal(); 
         }
 
         els.mobileNewBtn.addEventListener('click', handleNew);
@@ -369,83 +409,72 @@
             const docData = state.documents.find(d => d.id === id);
             if (docData) {
                 state.activeDoc = docData;
-                state.form = { name: docData.name, content: docData.content || '', fileType: docData.fileType || 'text/plain' };
-                renderMain();
-                renderSidebar();
-                toggleSidebar(true);
+                state.form = { 
+                    name: docData.name, content: docData.content || '', fileType: docData.fileType || 'text/plain',
+                    folder: docData.folder || 'Genel', color: docData.color || '#3b82f6', dueDate: docData.dueDate || ''
+                };
+                renderMain(); renderSidebar(); toggleSidebar(true);
             }
         };
 
         window.deleteDoc = async function(id, event) {
             event.stopPropagation();
-            if (!confirm("Bu öğeyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
+            if (!confirm("Kalıcı olarak silinecek, emin misiniz?")) return;
             if (!state.user) return;
-            
             try {
-                await deleteDoc(doc(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data', id));
+                await deleteDoc(doc(db, 'artifacts', app_id, 'users', state.user.uid, 'files', id));
                 if (state.activeDoc && state.activeDoc.id === id) {
-                    state.activeDoc = null;
-                    state.form = { name: '', content: '', fileType: 'text/plain' };
+                    state.activeDoc = null; state.form = { name: '', content: '', fileType: 'text/plain', folder:'Genel' };
                     renderMain();
                 }
-                showToast("Silme işlemi başarılı");
-            } catch (error) {
-                showToast("Silinemedi", "error");
-            }
+                showToast("Silindi");
+            } catch (error) { showToast("Silinemedi", "error"); }
         };
 
         async function performSave() {
-            const nameVal = state.form.name;
-            if (!nameVal) return showToast("Lütfen bir isim verin", "error");
-            if (!state.user) return showToast("Kaydetmek için giriş yapmalısınız.", "error");
+            if (!state.form.name) return showToast("Lütfen isim verin", "error");
+            if (!state.user) return;
 
             state.isSaving = true;
             const origHtml = els.saveBtn.innerHTML;
-            els.saveBtn.innerHTML = '<i class="ph ph-spinner-gap animate-spin text-lg"></i>';
+            els.saveBtn.innerHTML = '<i class="ph-animate ph-spinner-gap text-lg"></i>';
             
             try {
                 const documentId = state.activeDoc ? state.activeDoc.id : crypto.randomUUID();
-                const docRef = doc(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data', documentId);
+                const docRef = doc(db, 'artifacts', app_id, 'users', state.user.uid, 'files', documentId);
                 
                 const saveData = {
-                    name: nameVal,
+                    name: state.form.name,
                     fileType: state.form.fileType,
                     content: state.form.content,
+                    folder: state.form.folder || 'Genel',
+                    color: state.form.color || '#3b82f6',
+                    dueDate: state.form.dueDate || '',
                     updatedAt: Date.now()
                 };
                 
                 await setDoc(docRef, saveData);
-                showToast("Güvenle kaydedildi");
+                showToast("Kaydedildi");
                 
                 state.activeDoc = null;
-                state.form = { name: '', content: '', fileType: 'text/plain' };
-                renderSidebar();
                 renderMain();
 
-            } catch (error) {
-                showToast("Kaydedilemedi", "error");
-            } finally {
-                state.isSaving = false;
-                els.saveBtn.innerHTML = origHtml;
-            }
+            } catch (error) { showToast("Kaydedilemedi", "error"); } 
+            finally { state.isSaving = false; els.saveBtn.innerHTML = origHtml; }
         }
 
         els.saveBtn.addEventListener('click', () => {
             state.form.name = els.docNameInput.value.trim();
+            state.form.folder = els.docFolderInput.value.trim() || 'Genel';
+            state.form.dueDate = els.docDateInput.value;
             performSave();
         });
 
         els.uploadBtn.addEventListener('click', () => els.fileInput.click());
-        
         els.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
-            if (file.size > 800 * 1024) {
-                showToast("Dosya çok büyük. Maksimum 800KB.", "error");
-                e.target.value = '';
-                return;
-            }
+            if (file.size > 800 * 1024) return showToast("Maksimum 800KB.", "error");
 
             const isText = file.type === 'text/plain' || file.name.endsWith('.txt');
             const reader = new FileReader();
@@ -454,62 +483,91 @@
                 state.form.name = file.name;
                 state.form.content = evt.target.result;
                 state.form.fileType = file.type || (isText ? 'text/plain' : 'application/octet-stream');
+                state.form.folder = 'Yüklemeler';
+                state.form.color = '#10b981'; // Green for uploads
                 state.activeDoc = null; 
                 renderMain();
-                showToast("Dosya okundu. Buluta eklemek için kaydedin.");
+                showToast("Dosya eklendi. Kaydet'e basın.");
             };
 
-            if (isText) {
-                reader.readAsText(file);
-            } else {
-                reader.readAsDataURL(file);
-            }
+            isText ? reader.readAsText(file) : reader.readAsDataURL(file);
             e.target.value = '';
         });
 
+        function getAlarmBadge(dateStr) {
+            if (!dateStr) return '';
+            const dueDate = new Date(dateStr).getTime();
+            const now = new Date().getTime();
+            const timeLeft = dueDate - now;
+            
+            if (timeLeft < 0) return `<i class="ph-fill ph-warning-circle text-red-500 text-lg animate-pulse" title="Süresi Geçti!"></i>`;
+            if (timeLeft < 86400000 * 3) return `<i class="ph-fill ph-clock text-amber-400 text-lg" title="Son Tarih Yaklaştı"></i>`;
+            return `<i class="ph-fill ph-calendar text-blue-400" title="Son Tarih: ${dateStr}"></i>`;
+        }
+
         function renderSidebar() {
-            if (!isFirebaseReady) {
-                 els.docList.innerHTML = `
-                    <div class="text-center p-4 border border-red-800/50 bg-red-900/10 rounded-xl mt-4">
-                        <i class="ph ph-warning-circle text-3xl text-red-500 mb-2"></i>
-                        <p class="text-sm text-red-400">Bağlantı hatası.</p>
-                    </div>`;
-                 return;
-            }
+            if (!isFirebaseReady) return;
 
             if (state.documents.length === 0) {
-                els.docList.innerHTML = `
-                    <div class="text-center p-6 border border-slate-800 border-dashed rounded-xl mt-4">
-                        <i class="ph ph-file-dashed text-3xl text-slate-600 mb-2"></i>
-                        <p class="text-sm text-slate-500">Henüz kayıt yok.</p>
-                    </div>`;
+                els.docList.innerHTML = `<div class="text-center p-6 border border-slate-800 border-dashed rounded-xl"><i class="ph-duotone ph-file-dashed text-4xl text-slate-600 mb-2"></i><p class="text-sm text-slate-500">Alan boş.</p></div>`;
                 return;
             }
 
-            els.docList.innerHTML = state.documents.map(doc => {
-                const isActive = state.activeDoc && state.activeDoc.id === doc.id;
-                const isRealFile = doc.content && doc.content.startsWith('data:');
-                const icon = isRealFile ? 'ph-file-pdf' : 'ph-file-text';
-                const iconColor = isRealFile ? 'text-emerald-400' : 'text-blue-400';
-                
-                return `
-                <div onclick="selectDoc('${doc.id}')" class="group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${isActive ? 'bg-blue-900/20 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.1)]' : 'bg-slate-800/30 border-slate-800 hover:bg-slate-800 hover:border-slate-700'}">
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="w-8 h-8 rounded-lg bg-slate-950 flex items-center justify-center shrink-0 border border-slate-700/50">
-                            <i class="ph ${icon} ${iconColor} text-lg"></i>
-                        </div>
-                        <span class="truncate font-medium text-sm text-slate-200">${doc.name}</span>
+            // Klasörlere göre grupla
+            const groups = {};
+            state.documents.forEach(doc => {
+                const f = doc.folder || 'Genel';
+                if(!groups[f]) groups[f] = [];
+                groups[f].push(doc);
+            });
+
+            let html = '';
+            for (const [folderName, docs] of Object.entries(groups)) {
+                html += `
+                <div class="mb-4">
+                    <div class="flex items-center gap-2 mb-2 px-2 text-slate-400">
+                        <i class="ph-fill ph-folder text-slate-500"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider">${folderName}</span>
+                        <span class="text-xs bg-slate-800 px-1.5 py-0.5 rounded-md ml-auto">${docs.length}</span>
                     </div>
-                    <button onclick="deleteDoc('${doc.id}', event)" class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors md:opacity-0 md:group-hover:opacity-100">
-                        <i class="ph ph-trash"></i>
-                    </button>
-                </div>
+                    <div class="flex flex-col gap-1.5">
                 `;
-            }).join('');
+                
+                docs.forEach(doc => {
+                    const isActive = state.activeDoc && state.activeDoc.id === doc.id;
+                    const isRealFile = doc.content && doc.content.startsWith('data:');
+                    const icon = isRealFile ? 'ph-file-pdf' : 'ph-file-text';
+                    const alarm = getAlarmBadge(doc.dueDate);
+                    const docColor = doc.color || '#3b82f6';
+                    
+                    html += `
+                    <div onclick="selectDoc('${doc.id}')" class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all border border-transparent ${isActive ? 'bg-slate-800 border-slate-700 shadow-md' : 'hover:bg-slate-800/50 hover:border-slate-700/50'}">
+                        <div class="flex items-center gap-3 overflow-hidden flex-1">
+                            <div class="w-2 h-8 rounded-full shrink-0" style="background-color: ${docColor}"></div>
+                            <div class="flex flex-col overflow-hidden">
+                                <span class="truncate font-medium text-sm text-slate-200">${doc.name}</span>
+                                ${doc.dueDate ? `<span class="text-[10px] text-slate-500 truncate">${doc.dueDate}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${alarm}
+                            <button onclick="deleteDoc('${doc.id}', event)" class="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 hidden md:block">
+                                <i class="ph ph-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                });
+                
+                html += `</div></div>`;
+            }
+            els.docList.innerHTML = html;
         }
 
         function renderMain() {
             els.docNameInput.value = state.form.name;
+            els.docFolderInput.value = state.form.folder || '';
+            els.docDateInput.value = state.form.dueDate || '';
+
             const isRealFile = state.form.content && state.form.content.startsWith('data:');
             
             if (!isRealFile) {
@@ -518,12 +576,14 @@
                 
                 if (!state.activeDoc && !state.form.content) {
                     els.editorContainer.innerHTML = `
-                        <div class="h-full flex flex-col items-center justify-center text-slate-500 py-20">
-                            <i class="ph ph-files text-6xl mb-4 text-blue-500/30"></i>
-                            <h2 class="text-xl font-medium text-slate-300 mb-2">Sistem Hazır</h2>
-                            <p class="text-sm mb-6 text-center max-w-sm">Sol menüden bir belge seçebilir veya yeni bir not oluşturabilirsiniz.</p>
-                            <button onclick="handleNew()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-500/20 font-medium transition-colors flex items-center gap-2">
-                                <i class="ph ph-plus"></i> Yeni Not Oluştur
+                        <div class="h-full flex flex-col items-center justify-center text-slate-500 py-10">
+                            <div class="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center mb-6">
+                                <i class="ph-duotone ph-rocket text-5xl text-blue-500"></i>
+                            </div>
+                            <h2 class="text-xl font-bold text-white mb-2">Çalışma Alanı Hazır</h2>
+                            <p class="text-sm mb-6 text-center max-w-sm">Tüm evraklarınızı renklendirin, klasörleyin ve tarih vererek takibini kolaylaştırın.</p>
+                            <button onclick="handleNew()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-500/20 font-medium transition-all hover:-translate-y-1">
+                                Yeni Belge Oluştur
                             </button>
                         </div>
                     `;
@@ -531,23 +591,28 @@
                 }
 
                 els.editorContainer.innerHTML = `
-                    <div class="max-w-2xl mx-auto h-auto min-h-[300px] flex flex-col bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden p-5 md:p-6 mb-8">
-                        <div class="flex justify-between items-start md:items-center mb-6 border-b border-slate-800/50 pb-5 gap-4 flex-col md:flex-row">
-                            <h2 class="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
-                                <div class="p-2 bg-blue-500/10 rounded-xl text-blue-400 border border-blue-500/20"><i class="ph ph-text-aa text-lg"></i></div>
-                                ${state.form.name || 'İsimsiz Not'}
-                            </h2>
+                    <div class="max-w-3xl mx-auto h-auto min-h-[300px] flex flex-col bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1" style="background-color: ${state.form.color || '#3b82f6'}"></div>
+                        
+                        <div class="flex justify-between items-start md:items-center mb-6 border-b border-slate-800/50 pb-6 gap-4 flex-col md:flex-row">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                                    <i class="ph-fill ph-folder"></i> ${state.form.folder || 'Genel'}
+                                </span>
+                                <h2 class="text-2xl font-bold text-white">${state.form.name || 'İsimsiz'}</h2>
+                                ${state.form.dueDate ? `<span class="text-sm text-amber-500 flex items-center gap-1 mt-1"><i class="ph-fill ph-clock"></i> Son Tarih: ${state.form.dueDate}</span>` : ''}
+                            </div>
                             <div class="flex items-center gap-2 w-full md:w-auto">
-                                <button onclick="shareDoc()" class="flex-1 md:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm text-white flex items-center justify-center gap-2 font-medium transition-all shrink-0">
-                                    <i class="ph ph-share-network text-lg"></i> Paylaş
+                                <button onclick="shareDoc()" class="flex-1 md:flex-none p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-white transition-all">
+                                    <i class="ph ph-share-network text-lg"></i>
                                 </button>
-                                <button onclick="openNoteModal()" class="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm text-white flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-500/20 transition-all shrink-0">
+                                <button onclick="openNoteModal()" class="flex-1 md:flex-none px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm text-white flex items-center justify-center gap-2 font-bold shadow-lg shadow-blue-500/20 transition-all">
                                     <i class="ph ph-pencil-simple text-lg"></i> Düzenle
                                 </button>
                             </div>
                         </div>
-                        <div class="flex-1 text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed pr-2 break-words">
-                            ${state.form.content || '<span class="text-slate-500 italic">Bu not boş.</span>'}
+                        <div class="flex-1 text-slate-300 whitespace-pre-wrap font-sans text-base leading-relaxed break-words">
+                            ${state.form.content || '<span class="text-slate-600 italic">Boş belge.</span>'}
                         </div>
                     </div>
                 `;
@@ -556,46 +621,41 @@
                 els.saveBtn.classList.remove('hidden');
 
                 let previewHtml = '';
-                
                 if (state.form.fileType === 'application/pdf') {
-                    previewHtml = `<iframe src="${state.form.content}" class="w-full h-[50vh] md:h-full rounded-xl bg-white border border-slate-800 shadow-xl"></iframe>`;
+                    previewHtml = `<iframe src="${state.form.content}" class="w-full h-[50vh] md:h-full rounded-2xl bg-white border border-slate-800 shadow-xl"></iframe>`;
                 } else if (state.form.fileType.startsWith('image/')) {
-                    previewHtml = `<div class="w-full h-full flex items-center justify-center bg-slate-900/50 rounded-xl border border-slate-800 p-4 shadow-inner">
-                        <img src="${state.form.content}" class="max-w-full max-h-[50vh] md:max-h-full object-contain rounded-lg shadow-lg">
-                    </div>`;
+                    previewHtml = `<div class="w-full h-full flex items-center justify-center bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-inner"><img src="${state.form.content}" class="max-w-full max-h-[50vh] md:max-h-full object-contain rounded-lg"></div>`;
                 } else {
-                    previewHtml = `<div class="h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/30 rounded-xl border border-slate-800 p-8 text-center min-h-[300px]">
-                        <i class="ph ph-file-dashed text-6xl mb-4 opacity-30 text-emerald-400"></i>
-                        <p class="font-medium text-slate-300 text-lg">Önizleme Desteklenmiyor</p>
+                    previewHtml = `<div class="h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/50 rounded-2xl border border-slate-800 p-8 text-center min-h-[300px]">
+                        <i class="ph-duotone ph-file-dashed text-6xl mb-4 opacity-50 text-slate-400"></i><p class="font-medium text-slate-300">Önizleme Desteklenmiyor</p>
                     </div>`;
                 }
 
                 els.editorContainer.innerHTML = `
-                    <div class="max-w-3xl mx-auto h-auto flex flex-col lg:flex-row gap-6 w-full">
-                        <div class="w-full lg:w-72 flex flex-col items-center justify-center border border-slate-800 rounded-2xl bg-slate-900/40 p-6 shrink-0 h-fit shadow-xl">
-                            <div class="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20">
-                               <i class="ph ph-file text-4xl text-emerald-500"></i>
+                    <div class="max-w-5xl mx-auto h-auto flex flex-col lg:flex-row gap-6 w-full">
+                        <div class="w-full lg:w-80 flex flex-col items-center justify-center border border-slate-800 rounded-2xl bg-slate-900 p-8 shrink-0 h-fit shadow-xl relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1" style="background-color: ${state.form.color || '#10b981'}"></div>
+                            <div class="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 border border-slate-700">
+                               <i class="ph-duotone ph-file-text text-4xl" style="color: ${state.form.color || '#10b981'}"></i>
                             </div>
                             <h3 class="text-lg font-bold text-white mb-2 text-center break-all">${state.form.name || 'İsimsiz Dosya'}</h3>
-                            <div class="flex flex-col gap-2 w-full mt-4">
-                                <button onclick="shareDoc()" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all font-medium">
+                            <span class="text-xs font-bold uppercase text-slate-500 mb-6 bg-slate-950 px-3 py-1 rounded-full">${state.form.folder || 'Genel'}</span>
+                            
+                            <div class="flex flex-col gap-3 w-full">
+                                <button onclick="shareDoc()" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all font-medium border border-slate-700">
                                     <i class="ph ph-share-network text-lg"></i> Paylaş
                                 </button>
-                                <a href="${state.form.content}" download="${state.form.name}" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-lg shadow-emerald-500/20 font-bold">
-                                   <i class="ph ph-download-simple text-lg"></i> İndir
+                                <a href="${state.form.content}" download="${state.form.name}" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/20 font-bold">
+                                   <i class="ph ph-download-simple text-lg"></i> Cihaza İndir
                                 </a>
                             </div>
                         </div>
-                        <div class="flex-1">
-                            ${previewHtml}
-                        </div>
+                        <div class="flex-1">${previewHtml}</div>
                     </div>
                 `;
             }
         }
-
         renderMain(); 
-
     </script>
 </body>
 </html>
