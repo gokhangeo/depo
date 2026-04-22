@@ -380,7 +380,8 @@
 
         function loadDocuments() {
             if (!isFirebaseReady || !state.user) return;
-            const docsRef = collection(db, 'artifacts', app_id, 'users', state.user.uid, 'files');
+            // Eski evrakları görmek için "text_data" olarak ayarlandı
+            const docsRef = collection(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data');
             onSnapshot(docsRef, (snapshot) => {
                 state.documents = [];
                 snapshot.forEach((doc) => state.documents.push({ id: doc.id, ...doc.data() }));
@@ -422,7 +423,8 @@
             if (!confirm("Kalıcı olarak silinecek, emin misiniz?")) return;
             if (!state.user) return;
             try {
-                await deleteDoc(doc(db, 'artifacts', app_id, 'users', state.user.uid, 'files', id));
+                // Eski evrakları silmek için "text_data" kullanılıyor
+                await deleteDoc(doc(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data', id));
                 if (state.activeDoc && state.activeDoc.id === id) {
                     state.activeDoc = null; state.form = { name: '', content: '', fileType: 'text/plain', folder:'Genel' };
                     renderMain();
@@ -441,7 +443,8 @@
             
             try {
                 const documentId = state.activeDoc ? state.activeDoc.id : crypto.randomUUID();
-                const docRef = doc(db, 'artifacts', app_id, 'users', state.user.uid, 'files', documentId);
+                // Eski evrakların yanına kaydetmek için "text_data" kullanılıyor
+                const docRef = doc(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data', documentId);
                 
                 const saveData = {
                     name: state.form.name,
@@ -513,7 +516,6 @@
                 return;
             }
 
-            // Klasörlere göre grupla
             const groups = {};
             state.documents.forEach(doc => {
                 const f = doc.folder || 'Genel';
