@@ -215,7 +215,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const a1 = "AIzaSy"; const a2 = "CDtjM2"; const a3 = "BxrUL5";
         const a4 = "XXNi4i"; const a5 = "OLkkKC"; const a6 = "683cAzQcI";
@@ -296,7 +296,6 @@
         els.menuBtn.addEventListener('click', () => toggleSidebar());
         els.overlay.addEventListener('click', () => toggleSidebar(true));
 
-        // MODAL AÇILIŞ DÜZENLEMESİ (PDF ve Görsellerin bozulmasını engeller)
         window.openNoteModal = function() {
             els.modalTitleInput.value = state.form.name || '';
             els.modalFolderInput.value = state.form.folder || 'Genel';
@@ -348,6 +347,53 @@
             } else {
                 navigator.clipboard.writeText(shareText);
                 showToast("Panoya kopyalandı!");
+            }
+        };
+
+        // --- SÜRÜKLE BIRAK İŞLEMLERİ ---
+        window.handleDragStart = function(e, id) {
+            e.dataTransfer.setData('text/plain', id);
+            e.target.classList.add('opacity-50');
+        };
+
+        window.handleDragEnd = function(e) {
+            e.target.classList.remove('opacity-50');
+            document.querySelectorAll('.folder-drop-zone').forEach(el => {
+                el.classList.remove('bg-blue-500/10', 'border-blue-500/30');
+            });
+        };
+
+        window.handleDragOver = function(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('bg-blue-500/10', 'border-blue-500/30');
+        };
+
+        window.handleDragLeave = function(e) {
+            e.currentTarget.classList.remove('bg-blue-500/10', 'border-blue-500/30');
+        };
+
+        window.handleDrop = async function(e, targetFolder) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('bg-blue-500/10', 'border-blue-500/30');
+            const docId = e.dataTransfer.getData('text/plain');
+            if (!docId || !state.user) return;
+
+            const movedDoc = state.documents.find(d => d.id === docId);
+            if(movedDoc && movedDoc.folder === targetFolder) return;
+
+            try {
+                const docRef = doc(db, 'artifacts', app_id, 'users', state.user.uid, 'text_data', docId);
+                await updateDoc(docRef, { folder: targetFolder, updatedAt: Date.now() });
+                state.expandedFolders[targetFolder] = true;
+                showToast("Dosya taşındı.");
+                // Aktif olan dosya taşındıysa ekranı yenile
+                if(state.activeDoc && state.activeDoc.id === docId) {
+                    state.activeDoc.folder = targetFolder;
+                    state.form.folder = targetFolder;
+                    renderMain();
+                }
+            } catch(err) {
+                showToast("Taşınamadı.", "error");
             }
         };
 
@@ -499,7 +545,6 @@
             finally { state.isSaving = false; els.saveBtn.innerHTML = origHtml; }
         }
 
-        // ÜST KONTROL ÇUBUĞUNDAN KAYDETME
         els.saveBtn.addEventListener('click', () => {
             state.form.name = els.docNameInput.value.trim();
             state.form.folder = els.docFolderInput.value.trim() || 'Genel';
@@ -568,13 +613,16 @@
                 const isExpanded = state.expandedFolders[folderName] === true;
                 
                 html += `
-                <div class="mb-2">
+                <div class="mb-2 folder-drop-zone rounded-xl border border-transparent transition-all"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event, '${folderName.replace(/'/g, "\\'")}')">
                     <button onclick="toggleFolder('${folderName.replace(/'/g, "\\'")}')" class="w-full flex items-center justify-between px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 pointer-events-none">
                             <i class="ph-fill ${isExpanded ? 'ph-folder-open' : 'ph-folder'} text-blue-500 text-lg"></i>
                             <span class="text-xs font-bold uppercase tracking-wider">${folderName}</span>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 pointer-events-none">
                             <span class="text-xs bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded-md font-bold border border-slate-700">${docs.length}</span>
                             <i class="ph ${isExpanded ? 'ph-caret-down' : 'ph-caret-right'} text-slate-500"></i>
                         </div>
@@ -590,8 +638,12 @@
                     const docColor = doc.color || '#3b82f6';
                     
                     html += `
-                    <div onclick="selectDoc('${doc.id}')" class="group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all border ${isActive ? 'bg-[#0B1121] border-slate-700 shadow-sm' : 'border-transparent hover:bg-slate-800/50'}">
-                        <div class="flex items-center gap-3 overflow-hidden flex-1">
+                    <div draggable="true"
+                         ondragstart="handleDragStart(event, '${doc.id}')"
+                         ondragend="handleDragEnd(event)"
+                         onclick="selectDoc('${doc.id}')" 
+                         class="group flex items-center justify-between p-2.5 rounded-xl cursor-grab active:cursor-grabbing transition-all border ${isActive ? 'bg-[#0B1121] border-slate-700 shadow-sm' : 'border-transparent hover:bg-slate-800/50'}">
+                        <div class="flex items-center gap-3 overflow-hidden flex-1 pointer-events-none">
                             <div class="w-2 h-8 rounded-full shrink-0" style="background-color: ${docColor}"></div>
                             <div class="flex flex-col overflow-hidden">
                                 <span class="truncate font-semibold text-sm ${isActive ? 'text-blue-400' : 'text-slate-300'}">${doc.name}</span>
